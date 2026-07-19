@@ -3,7 +3,7 @@ cim:
   target: src/webview/markdownPane.ts
   kind: file
   symbol: MarkdownPane
-  contentHash: 339b9ded7795
+  contentHash: 01f80078810d
 ---
 # markdownPane.ts
 
@@ -30,11 +30,13 @@ CIM 右侧文档面板：Webview + Vditor IR / 纯文本源码切换，带主页
 
 ## 性能注意
 
-- 新建绑定：先写文档并打开面板，索引/漂移扫描后台进行，避免空白等待
-- 打开文档：先瞬时显示源码文本，Vditor IR 就绪后再切换，避免冷启动白屏
+- 新建绑定：对话框期间离屏预热 Vditor；打开后源码盖住直至 IR 就绪再切换
+- 关闭 hljs，降低首次 `setValue` 卡顿
+- 面板在主页/无关联时用 off-screen `warming` 布局保活实例（避免 `display:none`）
+- 新建绑定：先写文档并打开面板，索引/漂移扫描后台进行
 - 复用单个 IR 实例；`setValue(md, true)` 清栈，避免残留代码块视图
 - 正文勿写裸 `---` 示例（见 `mdProtect.ts`）；加载前会保护围栏内分隔线
-- 不在 `display:none` 的容器里预热 Vditor（易卡且布局异常）
+- 面板已打开时勿用 `Beside` 再次 reveal（会改分栏尺寸）
 
 ## 约束
 

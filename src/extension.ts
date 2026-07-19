@@ -181,6 +181,9 @@ async function bindCurrentFile(
   await store.ensureLayout();
   await scaffoldAgentFiles(store.workspaceFolder.uri);
 
+  // Warm Vditor while the user picks bind options (biggest first-open cost).
+  void splitSync?.warmEditor();
+
   const kindPick = await vscode.window.showQuickPick(
     [
       {
@@ -464,7 +467,12 @@ async function deleteDoc(
     return;
   }
 
+  const indexBefore = await store.read();
+  const deletedBinding = indexBefore.bindings.find((b) => normalizeRelPath(b.doc) === docRel);
+  const targetPath = deletedBinding?.target.path;
   const wasCurrent = splitSync?.currentDocRel() === docRel;
+  const wasHome = splitSync?.isHome() === true;
+
   splitSync?.releaseDoc(docRel);
   try {
     await store.deleteDoc(docRel);
@@ -476,11 +484,11 @@ async function deleteDoc(
 
   treeProvider?.refresh();
   codeLensProvider?.refresh();
-  await driftChecker?.scanAll();
+  await driftChecker?.scanAll({ notify: false });
 
-  if (wasCurrent || splitSync?.isHome()) {
-    // Stay in place: do not reveal with Beside (that shrinks/resizes editor groups).
-    await splitSync?.openHome(false);
+  // After delete: show unbound (or remaining binding) for that source — not the home catalog.
+  if ((wasCurrent || wasHome) && targetPath) {
+    await splitSync?.syncForSourceRel(targetPath, false);
   } else {
     await splitSync?.syncNow();
   }

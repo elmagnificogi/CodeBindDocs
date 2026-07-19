@@ -129,6 +129,11 @@ export class SplitSync {
     await this.pane.showHome(this.resolveColumn(), forceFocus);
   }
 
+  /** Ensure Vditor starts warming when the pane already exists (e.g. during bind dialogs). */
+  async warmEditor(): Promise<void> {
+    await this.pane.warmIr();
+  }
+
   /** Doc currently shown in the pane (workspace-relative), if any. */
   currentDocRel(): string | undefined {
     return this.pane.currentDocRel;
@@ -140,6 +145,36 @@ export class SplitSync {
 
   releaseDoc(docRel: string): void {
     this.pane.releaseDoc(docRel);
+  }
+
+  /** Sync pane for a workspace-relative source path (unbound if no bindings left). */
+  async syncForSourceRel(sourceRel: string, forceFocus = false): Promise<void> {
+    const store = this.getStore();
+    if (!store) {
+      return;
+    }
+    const rel = normalizeRelPath(sourceRel);
+    if (!rel || store.isUnderDocsPath(rel)) {
+      return;
+    }
+    if (!(await store.exists())) {
+      return;
+    }
+    const index = await store.read();
+    const forFile = store.findBindingsForTarget(index, rel);
+    if (!forFile.length) {
+      await this.showUnbound(rel, forceFocus, shouldOfferBind(rel));
+      return;
+    }
+    const editor = vscode.window.visibleTextEditors.find(
+      (e) => store.toWorkspaceRelative(e.document.uri) === rel
+    );
+    const line = (editor?.selection.active.line ?? 0) + 1;
+    const binding =
+      store.resolveBindingForLine(index, rel, line) ??
+      forFile.find((b) => b.target.kind === 'file') ??
+      forFile[0];
+    await this.openDoc(store, binding, forceFocus);
   }
 
   private async onActiveEditor(editor: vscode.TextEditor | undefined): Promise<void> {

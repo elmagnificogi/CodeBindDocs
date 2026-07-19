@@ -51,7 +51,8 @@ type HostToWeb =
       hints: MissingItem[];
       canBack: boolean;
       canForward: boolean;
-    };
+    }
+  | { type: 'warmIr' };
 
 type WebToHost =
   | { type: 'ready' }
@@ -397,6 +398,19 @@ export class MarkdownPane {
     } satisfies HostToWeb);
   }
 
+  /** Pre-create Vditor off-screen so the first doc open skips cold init. */
+  async warmIr(): Promise<void> {
+    // Never create a new editor group just to warm — that resizes splits mid-dialog.
+    if (!this.panel) {
+      return;
+    }
+    await this.panel.webview.postMessage({ type: 'warmIr' } satisfies HostToWeb);
+  }
+
+  get isOpen(): boolean {
+    return Boolean(this.panel);
+  }
+
   private async ensurePanel(column: vscode.ViewColumn, preserveFocus: boolean): Promise<void> {
     if (this.panel) {
       // Never move an existing panel into Beside/Two — that resizes editor groups.
@@ -712,7 +726,20 @@ export class MarkdownPane {
     }
     #unbound.center.visible { display: flex; }
     #editorRoot { height: calc(100% - 34px); }
-    #editorRoot.hidden, #homeBar.hidden, #editorBar.hidden { display: none; }
+    /* Off-screen warm: keep real layout so Vditor can init without display:none. */
+    #editorRoot.warming {
+      position: fixed !important;
+      left: -12000px !important;
+      top: 0 !important;
+      width: 900px !important;
+      height: 700px !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      z-index: -1 !important;
+      display: block !important;
+    }
+    #editorRoot.hidden { display: none; }
+    #homeBar.hidden, #editorBar.hidden { display: none; }
     #homeBar { display: none; }
     #homeBar.visible { display: flex; }
     #unbound h2, #home h2 { margin: 0 0 8px; font-weight: 600; font-size: 16px; }
@@ -877,6 +904,7 @@ export class MarkdownPane {
     let vditor = null;
     let irReady = false;
     let pendingIrReveal = false;
+    let warmTimer = null;
     let mode = 'ir';
     let applying = false;
     let pendingMarkdown = '';
@@ -902,11 +930,39 @@ export class MarkdownPane {
       btnForward.disabled = !canForward;
     }
 
+    /** Park editor off-screen (keep Vditor alive) or fully hide if not created yet. */
+    function parkEditor() {
+      editorBar.classList.add('hidden');
+      if (vditor || editorRoot.classList.contains('warming')) {
+        editorRoot.classList.remove('hidden');
+        editorRoot.classList.add('warming');
+      } else {
+        editorRoot.classList.remove('warming');
+        editorRoot.classList.add('hidden');
+      }
+    }
+
     function hideAll() {
       unboundEl.classList.remove('visible');
       homeEl.classList.remove('visible');
-      editorRoot.classList.add('hidden');
-      editorBar.classList.add('hidden');
+      parkEditor();
+    }
+
+    function scheduleWarmIr(immediate) {
+      if (vditor) return;
+      if (warmTimer) {
+        clearTimeout(warmTimer);
+        warmTimer = null;
+      }
+      const run = function () {
+        warmTimer = null;
+        if (vditor) return;
+        editorRoot.classList.remove('hidden');
+        editorRoot.classList.add('warming');
+        ensureIr('');
+      };
+      if (immediate) run();
+      else warmTimer = setTimeout(run, 80);
     }
 
     function showUnbound(sourceRel, canBack, canForward, canCreate) {
@@ -922,6 +978,7 @@ export class MarkdownPane {
         ? '无关联文档 · 可新建绑定或返回主页'
         : '无关联文档 · 此类文件默认不提示新建绑定';
       setNav(canBack, canForward);
+      scheduleWarmIr(false);
     }
 
     function driftBadge(kind) {
@@ -1061,6 +1118,7 @@ export class MarkdownPane {
         hint.textContent = '主页 · 选择文档打开';
       }
       setNav(canBack, canForward);
+      scheduleWarmIr(false);
     }
 
     function escapeHtml(s) {
@@ -1199,10 +1257,11 @@ export class MarkdownPane {
       unboundEl.classList.remove('visible');
       homeEl.classList.remove('visible');
       editorRoot.classList.remove('hidden');
+      editorRoot.classList.remove('warming');
       editorBar.classList.remove('hidden');
       updateHint();
       setNav(canBack, canForward);
-      if (mode === 'ir' && vditor) {
+      if (mode === 'ir' && vditor && irReady) {
         try { vditor.resize(Math.max(240, window.innerHeight - 40)); } catch (_) {}
       }
     }
@@ -1230,7 +1289,7 @@ export class MarkdownPane {
         value: initialValue || '',
         cdn: '${vditorRoot}',
         cache: { enable: false },
-        toolbarConfig: { pin: true },
+        toolbarConfig: { pin: true, hide: false },
         toolbar: [
           'headings', 'bold', 'italic', 'strike', '|',
           'list', 'ordered-list', 'check', '|',
@@ -1240,15 +1299,17 @@ export class MarkdownPane {
         theme: isDark() ? 'dark' : 'classic',
         preview: {
           theme: { current: isDark() ? 'dark' : 'light' },
-          hljs: { style: isDark() ? 'native' : 'github' }
+          // hljs is expensive on first paint; plain IR is enough for docs.
+          hljs: { enable: false }
         },
         after: function () {
           applying = false;
           irReady = true;
+          try { vditor.resize(Math.max(240, window.innerHeight - 40)); } catch (_) {}
           if (pendingIrReveal && mode === 'ir') {
             pendingIrReveal = false;
+            // Content already applied via constructor value or setIrValue under the source cover.
             showModePane('ir');
-            try { vditor.resize(Math.max(240, window.innerHeight - 40)); } catch (_) {}
           }
         },
         input: function (value) {
@@ -1264,7 +1325,8 @@ export class MarkdownPane {
       if (!vditor) return;
       applying = true;
       try { vditor.setValue(markdown || '', true); } catch (_) {}
-      setTimeout(function () { applying = false; }, 50);
+      // Yield so the source cover stays visible during the heavy parse.
+      setTimeout(function () { applying = false; }, 0);
     }
 
     function setSourceValue(markdown) {
@@ -1272,6 +1334,13 @@ export class MarkdownPane {
       mdSource.value = markdown || '';
       pendingMarkdown = mdSource.value;
       applying = false;
+    }
+
+    function revealIrWhenQuiet() {
+      if (mode !== 'ir') return;
+      pendingIrReveal = false;
+      showModePane('ir');
+      try { vditor && vditor.resize(Math.max(240, window.innerHeight - 40)); } catch (_) {}
     }
 
     function applyMarkdown(markdown, nextMode, canBack, canForward, docRel, deletable) {
@@ -1287,24 +1356,25 @@ export class MarkdownPane {
         showModePane('source');
         return;
       }
-      // IR: paint source text immediately, then reveal Vditor when ready (avoids blank wait).
+      // Always keep source as a cover until IR has content ready — avoids blank IR flash.
       setSourceValue(pendingMarkdown);
+      showModePane('source');
       if (!vditor) {
         pendingIrReveal = true;
-        showModePane('source');
         ensureIr(pendingMarkdown);
         return;
       }
-      pendingIrReveal = false;
-      showModePane('ir');
       if (!irReady) {
-        // Instance exists but still booting — keep source visible until after().
         pendingIrReveal = true;
-        showModePane('source');
         setIrValue(pendingMarkdown);
         return;
       }
+      // Pre-warmed: setValue under cover, then flip (one short parse, no cold init).
+      pendingIrReveal = true;
       setIrValue(pendingMarkdown);
+      requestAnimationFrame(function () {
+        requestAnimationFrame(revealIrWhenQuiet);
+      });
     }
 
     function switchModeLocal(want) {
@@ -1321,19 +1391,19 @@ export class MarkdownPane {
         setSourceValue(pendingMarkdown);
         showModePane('source');
       } else {
+        showModePane('source');
         if (!vditor) {
           pendingIrReveal = true;
-          showModePane('source');
           ensureIr(pendingMarkdown);
         } else if (!irReady) {
           pendingIrReveal = true;
           setIrValue(pendingMarkdown);
-          showModePane('source');
         } else {
-          pendingIrReveal = false;
-          showModePane('ir');
+          pendingIrReveal = true;
           setIrValue(pendingMarkdown);
-          try { vditor.resize(Math.max(240, window.innerHeight - 40)); } catch (_) {}
+          requestAnimationFrame(function () {
+            requestAnimationFrame(revealIrWhenQuiet);
+          });
         }
       }
       vscodeApi.postMessage({
@@ -1361,6 +1431,7 @@ export class MarkdownPane {
     });
     btnCreate.addEventListener('click', function () {
       if (!unboundSourceRel) return;
+      scheduleWarmIr(true);
       vscodeApi.postMessage({ type: 'createBind', sourceRel: unboundSourceRel });
     });
     btnHome.addEventListener('click', function () {
@@ -1381,6 +1452,10 @@ export class MarkdownPane {
     window.addEventListener('message', function (event) {
       const msg = event.data;
       if (!msg) return;
+      if (msg.type === 'warmIr') {
+        scheduleWarmIr(true);
+        return;
+      }
       if (msg.type === 'unbound') {
         showUnbound(msg.sourceRel || '', msg.canBack, msg.canForward, msg.canCreate !== false);
         return;
