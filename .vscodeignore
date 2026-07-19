@@ -1,11 +1,31 @@
+# Development / tooling
 .vscode/**
+.github/**
 .cim/**
-docs/**
+.cursor/**
+scripts/**
+test/**
+out-test/**
+.vscode-test/**
+
+# Sources (ship compiled out/ + media/)
 src/**
-node_modules/**
-.gitignore
-tsconfig.json
 **/*.ts
 **/*.map
+tsconfig.json
+tsconfig.test.json
+
+# Repo-only docs & agent files (README + CHANGELOG stay; relative doc links resolve via repository)
+docs/**
 AGENTS.md
-readme.md
+*.md
+!README.md
+!readme.md
+!CHANGELOG.md
+!LICENSE
+
+# Dependencies & build junk
+node_modules/**
+.gitignore
+**/.DS_Store
+*.vsix

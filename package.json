@@ -2,9 +2,18 @@
   "name": "codebind-docs",
   "displayName": "CodeBind Docs",
   "description": "旁路绑定代码文档：源码零侵入，Markdown + 分栏同步，本地可 Git，人与 Agent 共用设计上下文。",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "codebind",
   "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/elmagnificogi/CodeBindDocs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/elmagnificogi/CodeBindDocs/issues"
+  },
+  "homepage": "https://github.com/elmagnificogi/CodeBindDocs#readme",
   "keywords": [
     "documentation",
     "markdown",
@@ -19,8 +28,7 @@
     "CodeBind Docs"
   ],
   "categories": [
-    "Other",
-    "Documentation"
+    "Other"
   ],
   "galleryBanner": {
     "color": "#1e293b",
@@ -221,6 +229,8 @@
     "watch": "tsc -watch -p ./",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package --no-dependencies",
+    "publish:vsce": "vsce publish --no-dependencies",
+    "publish:ovsx": "ovsx publish --no-dependencies",
     "debug": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/debug.ps1",
     "debug:watch": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/debug.ps1 -Watch",
     "open:vscode": "npm run debug",
@@ -233,8 +243,10 @@
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.6.0",
     "glob": "^11.0.1",
     "mocha": "^11.1.0",
+    "ovsx": "^0.10.4",
     "typescript": "^5.3.3"
   },
   "dependencies": {

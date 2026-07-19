@@ -58,17 +58,20 @@ npm run debug:watch
 
 ## 打包上架
 
+完整清单与账号步骤见 **[PUBLISHING.md](PUBLISHING.md)**。
+
 ```bash
 npm run compile
-npm run package          # vsce package（需安装 @vscode/vsce）
+npm run package          # 生成 .vsix（需已 npm install，含 @vscode/vsce）
+# npm run publish:vsce   # 登录 Publisher + PAT 后发布到 Marketplace
 ```
 
 上架前请确认：
 
-- [readme.md](../readme.md) 简介与截图（可选）齐全  
-- [USER_GUIDE.md](USER_GUIDE.md) 与当前功能一致  
-- `package.json` 的 `publisher`、`version`、`engines`、`keywords`  
+- [README.md](../readme.md) / [CHANGELOG.md](../CHANGELOG.md) / [LICENSE](../LICENSE) 齐全  
+- `package.json` 的 `publisher`（当前 `codebind`）、`version`、`icon`、`repository`  
 - `npm test` 通过  
+- 已在 https://marketplace.visualstudio.com/manage 创建同名 Publisher
 
 ## 相关需求
 

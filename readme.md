@@ -1,5 +1,9 @@
 # CodeBind Docs（CBD）
 
+![image-20260719232659382](https://img.elmagnifico.tech/static/upload/elmagnifico/202607192327543.png)
+
+![](https://img.elmagnifico.tech/static/upload/elmagnifico/202607192327640.png)
+
 **旁路绑定的代码文档扩展**（VS Code / Cursor）：源码零侵入，文档落在仓库 Markdown 里，打开代码时左右分栏同步查看与编辑。适合人与 AI Agent 共用同一套设计上下文。
 
 命令与设置前缀为 **`cbd`**（CodeBind Docs 简称）。
@@ -86,6 +90,7 @@ cbd:
 | [产品需求](docs/REQUIREMENTS.md) | 定位、范围、数据模型 |
 | [测试说明](docs/testing.md) | `npm test` |
 | [开发调试](docs/DEVELOPMENT.md) | 编译、F5 / `npm run debug` |
+| [发布上架](docs/PUBLISHING.md) | Marketplace / Open VSX |
 
 ```bash
 npm install
