@@ -8,6 +8,7 @@
 
 ```text
 src/                 扩展源码
+test/                单元测试 + Extension Host 集成冒烟
 docs/                CIM 绑定文档 + 产品需求（默认 docsPath）
 AGENTS.md            Agent 入口说明（含模块→文档对照表）
 ```
@@ -18,6 +19,16 @@ AGENTS.md            Agent 入口说明（含模块→文档对照表）
 ```bash
 npm install
 ```
+
+### 测试
+
+```bash
+npm run test:unit          # 纯逻辑单元测试（快）
+npm run test:integration   # VS Code Extension Host 冒烟（首次会下载 VS Code）
+npm test                   # unit + integration
+```
+
+单元测试在 [`test/unit/`](test/unit/)，覆盖 frontmatter、漂移辅助、媒体路径、文档嵌入等；集成冒烟在 [`test/suite/`](test/suite/)。CI 见 [`.github/workflows/ci.yml`](.github/workflows/ci.yml)。
 
 ### 推荐：调试启动脚本（自动编译 + 打开 VS Code）
 

@@ -13,6 +13,7 @@ import {
 } from './util/rangePicker';
 import { applyDocTemplate, ensureDefaultTemplates, listDocTemplates } from './util/docTemplates';
 import { findOverlapsWithExisting } from './util/rangeOverlap';
+import { suggestSymbolInRange } from './util/suggestSymbol';
 
 let splitSync: SplitSync | undefined;
 let driftChecker: DriftChecker | undefined;
@@ -234,14 +235,11 @@ async function bindCurrentFile(
     }
     startLine = range.startLine;
     endLine = range.endLine;
-    symbol = await vscode.window.showInputBox({
-      prompt: `代码块符号名（可选，当前 L${startLine}-${endLine}）`,
-      placeHolder: '例如 activate',
-    });
-    if (symbol === undefined) {
+    const asked = await promptRangeSymbol(sourceUri, startLine, endLine);
+    if (!asked.ok) {
       return;
     }
-    symbol = symbol.trim() || undefined;
+    symbol = asked.symbol;
   }
 
   store.invalidateCache();
@@ -730,15 +728,11 @@ async function rebindDoc(
     startLine = range.startLine;
     endLine = range.endLine;
 
-    const symbolInput = await vscode.window.showInputBox({
-      prompt: `代码块符号名（可选，当前 L${startLine}-${endLine}）`,
-      placeHolder: '例如 activate',
-      value: previousSymbol ?? '',
-    });
-    if (symbolInput === undefined) {
+    const asked = await promptRangeSymbol(sourceUri, startLine, endLine, previousSymbol);
+    if (!asked.ok) {
       return;
     }
-    symbol = symbolInput.trim() || undefined;
+    symbol = asked.symbol;
   }
 
   binding.target = {
@@ -851,5 +845,48 @@ async function refreshAllDocHashes(): Promise<void> {
   codeLensProvider?.refresh();
   if (n > 0 && splitSync?.isHome()) {
     await splitSync.openHome(false);
+  }
+}
+
+/**
+ * Strongly nudge users to fill a symbol for range bindings.
+ * Esc / dismiss → cancel (`ok: false`). Empty after confirm → `symbol: undefined`.
+ */
+async function promptRangeSymbol(
+  sourceUri: vscode.Uri,
+  startLine: number,
+  endLine: number,
+  previous?: string
+): Promise<{ ok: false } | { ok: true; symbol?: string }> {
+  const suggested =
+    (previous && previous.trim()) ||
+    (await suggestSymbolInRange(sourceUri, startLine, endLine)) ||
+    '';
+
+  while (true) {
+    const input = await vscode.window.showInputBox({
+      prompt: `强烈建议填写符号名（函数/类名），便于行号漂移时一键重算 · 当前 L${startLine}-${endLine}`,
+      placeHolder: '例如 activate',
+      value: suggested,
+      ignoreFocusOut: true,
+    });
+    if (input === undefined) {
+      return { ok: false };
+    }
+    const trimmed = input.trim();
+    if (trimmed) {
+      return { ok: true, symbol: trimmed };
+    }
+    const go = await vscode.window.showWarningMessage(
+      '未填写 symbol。代码改动后行号易漂移，建议填写以便「按 symbol 重算行号」。',
+      '回去填写',
+      '仍然继续（不填）'
+    );
+    if (go === '仍然继续（不填）') {
+      return { ok: true, symbol: undefined };
+    }
+    if (!go) {
+      return { ok: false };
+    }
   }
 }

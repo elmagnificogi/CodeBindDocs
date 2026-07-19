@@ -400,7 +400,7 @@ export class DriftChecker {
     }
 
     const updated: string[] = [];
-    const unresolved: { oldRel: string; newRel: string }[] = [];
+    let bindingHits = 0;
 
     for (const file of e.files) {
       const oldRel = store.toWorkspaceRelative(file.oldUri);
@@ -412,19 +412,18 @@ export class DriftChecker {
         // Doc renames are picked up by rescan (binding id = path).
         continue;
       }
-      if (await store.updateTargetPath(oldRel, newRel)) {
-        updated.push(`${oldRel} → ${newRel}`);
-      } else {
-        // Might still have bindings that need manual rebind if path logic missed
-        unresolved.push({ oldRel, newRel });
+      const n = await store.updateTargetPath(oldRel, newRel);
+      if (n > 0) {
+        bindingHits += n;
+        updated.push(`${oldRel} → ${newRel}（${n} 条绑定）`);
       }
     }
 
     if (updated.length) {
       const choice = await vscode.window.showInformationMessage(
-        `CIM: 已根据改名更新绑定路径：\n${updated.slice(0, 3).join('\n')}${
-          updated.length > 3 ? `\n…共 ${updated.length} 处` : ''
-        }`,
+        `CIM: 已根据改名更新绑定路径（共 ${bindingHits} 条）：\n${updated
+          .slice(0, 3)
+          .join('\n')}${updated.length > 3 ? `\n…共 ${updated.length} 个改名项` : ''}`,
         '打开文档主页',
         '查看漂移'
       );
@@ -436,15 +435,7 @@ export class DriftChecker {
     }
 
     await store.writeDocsIndex();
-    const issues = await this.scanAll({ notify: true });
-
-    if (!updated.length && unresolved.length) {
-      void vscode.window.showWarningMessage(
-        `CIM: 检测到文件改名，但未找到可自动更新的绑定。可在主页或「查看漂移」中处理。`
-      );
-    } else if (issues.some((i) => i.kind === 'missing-target' || i.kind === 'missing-doc')) {
-      // scanAll notify already handles; ensure rename-related missing is visible
-    }
+    await this.scanAll({ notify: true });
   }
 
   private async onSave(doc: vscode.TextDocument): Promise<void> {
@@ -488,9 +479,12 @@ export class DriftChecker {
         i.kind === 'missing-target' ||
         i.kind === 'missing-doc'
     );
-    // Save-focused: only toast for the saved target. Global scan: warnings only (not mere hash info).
+    // Save-focused: only toast for the saved target. Prefer symbol/range retighten over hash.
+    // Global scan: warnings only (not mere hash info).
     const candidates = focusTarget
-      ? actionable.filter((i) => normalizeRelPath(i.targetPath) === normalizeRelPath(focusTarget))
+      ? actionable
+          .filter((i) => normalizeRelPath(i.targetPath) === normalizeRelPath(focusTarget))
+          .sort((a, b) => issueNotifyPriority(a) - issueNotifyPriority(b))
       : actionable.filter((i) => i.severity === 'warning');
 
     for (const issue of candidates) {
@@ -561,23 +555,30 @@ export class DriftChecker {
       actions.push('重新绑定', '删除文档');
     } else if (issue.kind === 'symbol' || issue.kind === 'range') {
       if (!issue.message.includes('未找到符号')) {
+        // Primary action — first button is the default affordance.
         actions.push('按 symbol 重算行号');
       }
-      actions.push('重新绑定');
+      actions.push('打开文档', '重新绑定');
     } else if (issue.kind === 'overlap') {
       actions.push('重新绑定');
     }
     if (issue.kind === 'missing-doc') {
       actions.push('打开源文件');
-    } else if (issue.kind !== 'missing-target') {
+    } else if (
+      issue.kind !== 'missing-target' &&
+      issue.kind !== 'symbol' &&
+      issue.kind !== 'range'
+    ) {
       actions.push('打开文档');
     }
     actions.push('忽略');
 
     const title =
-      issue.kind === 'range' || issue.kind === 'symbol' || issue.kind === 'overlap'
-        ? `CIM 绑定关系可能已变更`
-        : `CIM 绑定异常`;
+      issue.kind === 'range' || issue.kind === 'symbol'
+        ? `CIM：建议按 symbol 重算行号`
+        : issue.kind === 'overlap'
+          ? `CIM 绑定关系可能已变更`
+          : `CIM 绑定异常`;
 
     const pick = await vscode.window.showWarningMessage(
       `${title}\n${issue.message}\n文档：${issue.doc}`,
@@ -667,6 +668,25 @@ export class DriftChecker {
       this.statusBar.backgroundColor = undefined;
       this.statusBar.tooltip = '源码变更提醒（可忽略）— 点击查看';
     }
+  }
+}
+
+function issueNotifyPriority(issue: DriftIssue): number {
+  // Lower = notify first on save.
+  switch (issue.kind) {
+    case 'symbol':
+      return 0;
+    case 'range':
+      return 1;
+    case 'overlap':
+      return 2;
+    case 'missing-doc':
+    case 'missing-target':
+      return 3;
+    case 'hash':
+      return 9;
+    default:
+      return 5;
   }
 }
 

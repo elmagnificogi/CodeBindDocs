@@ -132,6 +132,11 @@
           "command": "cim.rebindDoc",
           "when": "view == cim.bindings && viewItem == binding",
           "group": "1_modification"
+        },
+        {
+          "command": "cim.bindCurrentFile",
+          "when": "view == cim.bindings && viewItem == unbound",
+          "group": "inline"
         }
       ]
     },
@@ -184,22 +189,35 @@
             "Plain Markdown source (textarea)"
           ],
           "description": "Markdown pane mode. ir = Typora-like instant rendering; source = plain Markdown text."
+        },
+        "cim.docPane.outline": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a document outline (TOC) beside the instant-rendering editor."
         }
       }
     }
   },
   "scripts": {
     "compile": "tsc -p ./ && node scripts/copy-vditor.js",
+    "compile:test": "tsc -p tsconfig.test.json",
     "watch": "tsc -watch -p ./",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package --no-dependencies",
     "debug": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/debug.ps1",
     "debug:watch": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/debug.ps1 -Watch",
-    "open:vscode": "npm run debug"
+    "open:vscode": "npm run debug",
+    "test:unit": "npm run compile:test && node -r ./test/stubs/register-vscode.js ./out-test/test/runUnit.js",
+    "test:integration": "npm run compile && npm run compile:test && node ./out-test/test/runIntegration.js",
+    "test": "npm run test:unit && npm run test:integration"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.4.1",
+    "glob": "^11.0.1",
+    "mocha": "^11.1.0",
     "typescript": "^5.3.3"
   },
   "dependencies": {

@@ -1,8 +1,15 @@
 import * as vscode from 'vscode';
 import { IndexStore } from '../store/indexStore';
 import { Binding, normalizeRelPath } from '../store/types';
+import { scanBindingCoverage } from '../util/bindableSources';
 
-export type CimTreeItem = IndexPageItem | BindingItem;
+export type CimTreeItem =
+  | IndexPageItem
+  | SectionItem
+  | BindingItem
+  | UnboundSourceItem
+  | UnboundMoreItem
+  | UnboundEmptyItem;
 
 export class IndexPageItem extends vscode.TreeItem {
   constructor(docsPath: string) {
@@ -15,6 +22,26 @@ export class IndexPageItem extends vscode.TreeItem {
       command: 'cim.openDocsIndex',
       title: 'Open Docs Index',
     };
+  }
+}
+
+export class SectionItem extends vscode.TreeItem {
+  constructor(
+    public readonly sectionId: 'bound' | 'unbound',
+    label: string,
+    count: number
+  ) {
+    super(
+      label,
+      sectionId === 'unbound'
+        ? vscode.TreeItemCollapsibleState.Collapsed
+        : vscode.TreeItemCollapsibleState.Expanded
+    );
+    this.contextValue = 'section';
+    this.description = String(count);
+    this.iconPath = new vscode.ThemeIcon(
+      sectionId === 'bound' ? 'link' : 'new-file'
+    );
   }
 }
 
@@ -46,9 +73,49 @@ export class BindingItem extends vscode.TreeItem {
   }
 }
 
+export class UnboundSourceItem extends vscode.TreeItem {
+  constructor(public readonly sourceRel: string) {
+    super(sourceRel, vscode.TreeItemCollapsibleState.None);
+    this.contextValue = 'unbound';
+    this.tooltip = `尚未绑定 · ${sourceRel}`;
+    this.iconPath = new vscode.ThemeIcon('file-code');
+    this.command = {
+      command: 'cim.bindCurrentFile',
+      title: 'Bind',
+      arguments: [sourceRel],
+    };
+  }
+}
+
+export class UnboundMoreItem extends vscode.TreeItem {
+  constructor(remaining: number) {
+    super(`还有 ${remaining} 个未绑定…`, vscode.TreeItemCollapsibleState.None);
+    this.contextValue = 'unboundMore';
+    this.tooltip = '完整列表见文档主页「绑定覆盖率」';
+    this.iconPath = new vscode.ThemeIcon('ellipsis');
+    this.command = {
+      command: 'cim.openDocsIndex',
+      title: 'Open Docs Index',
+    };
+  }
+}
+
+export class UnboundEmptyItem extends vscode.TreeItem {
+  constructor() {
+    super('全部已覆盖', vscode.TreeItemCollapsibleState.None);
+    this.contextValue = 'unboundEmpty';
+    this.iconPath = new vscode.ThemeIcon('check');
+  }
+}
+
+const UNBOUND_TREE_LIMIT = 40;
+
 export class CimTreeProvider implements vscode.TreeDataProvider<CimTreeItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<CimTreeItem | undefined | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+  private boundCache: BindingItem[] = [];
+  private unboundCache: string[] = [];
 
   constructor(private readonly getStore: () => IndexStore | undefined) {}
 
@@ -60,16 +127,48 @@ export class CimTreeProvider implements vscode.TreeDataProvider<CimTreeItem> {
     return element;
   }
 
-  async getChildren(): Promise<CimTreeItem[]> {
+  async getChildren(element?: CimTreeItem): Promise<CimTreeItem[]> {
     const store = this.getStore();
     if (!store || !(await store.exists())) {
       return [];
     }
-    const index = await store.read();
-    const bindings = index.bindings
-      .slice()
-      .sort((a, b) => a.target.path.localeCompare(b.target.path))
-      .map((b) => new BindingItem(b));
-    return [new IndexPageItem(store.docsPath), ...bindings];
+
+    if (!element) {
+      const index = await store.read();
+      this.boundCache = index.bindings
+        .slice()
+        .sort((a, b) => a.target.path.localeCompare(b.target.path))
+        .map((b) => new BindingItem(b));
+
+      try {
+        const coverage = await scanBindingCoverage(store, index);
+        this.unboundCache = coverage.unbound;
+      } catch {
+        this.unboundCache = [];
+      }
+
+      return [
+        new IndexPageItem(store.docsPath),
+        new SectionItem('bound', '已绑定', this.boundCache.length),
+        new SectionItem('unbound', '待绑定', this.unboundCache.length),
+      ];
+    }
+
+    if (element instanceof SectionItem) {
+      if (element.sectionId === 'bound') {
+        return this.boundCache;
+      }
+      const slice = this.unboundCache.slice(0, UNBOUND_TREE_LIMIT);
+      const items: CimTreeItem[] = slice.map((p) => new UnboundSourceItem(p));
+      if (this.unboundCache.length > UNBOUND_TREE_LIMIT) {
+        items.push(new UnboundMoreItem(this.unboundCache.length - UNBOUND_TREE_LIMIT));
+      }
+      if (!items.length) {
+        return [new UnboundEmptyItem()];
+      }
+      return items;
+    }
+
+    return [];
   }
 }

@@ -18,6 +18,31 @@
       "group": "build"
     },
     {
+      "type": "npm",
+      "script": "test:unit",
+      "group": "test",
+      "problemMatcher": [],
+      "label": "CIM: Test Unit",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "type": "npm",
+      "script": "test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "label": "CIM: Test All",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
       "label": "CIM: Debug (compile + VS Code)",
       "type": "npm",
       "script": "debug",

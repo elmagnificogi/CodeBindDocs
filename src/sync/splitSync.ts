@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { DriftIssue } from '../drift/driftChecker';
 import { IndexStore } from '../store/indexStore';
 import { Binding, normalizeRelPath } from '../store/types';
+import { isBindableSourceRel } from '../util/bindableSources';
 import { MarkdownPane } from '../webview/markdownPane';
 
 /**
@@ -14,6 +15,7 @@ export class SplitSync {
   private readonly pane: MarkdownPane;
   private readonly disposables: vscode.Disposable[] = [];
   private selectionTimer: NodeJS.Timeout | undefined;
+  private readonly statusBar: vscode.StatusBarItem;
 
   constructor(
     private readonly getStore: () => IndexStore | undefined,
@@ -25,8 +27,13 @@ export class SplitSync {
     const cfg = vscode.workspace.getConfiguration('cim');
     this.enabled = cfg.get<boolean>('splitSync.enabled', true);
 
+    this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
+    this.statusBar.command = 'cim.revealBoundDoc';
+    this.statusBar.tooltip = '打开当前文件的 CIM 旁路文档';
+
     this.disposables.push(
       this.pane,
+      this.statusBar,
       vscode.window.onDidChangeActiveTextEditor((editor) => {
         void this.onActiveEditor(editor);
       }),
@@ -163,7 +170,7 @@ export class SplitSync {
     const index = await store.read();
     const forFile = store.findBindingsForTarget(index, rel);
     if (!forFile.length) {
-      await this.showUnbound(rel, forceFocus, shouldOfferBind(rel));
+      await this.showUnbound(rel, forceFocus, shouldOfferBind(rel, store));
       return;
     }
     const editor = vscode.window.visibleTextEditors.find(
@@ -186,36 +193,43 @@ export class SplitSync {
     forceFocus: boolean
   ): Promise<void> {
     if (!this.enabled || this.syncing || !editor) {
+      this.updateStatusBar(undefined);
       return;
     }
     const store = this.getStore();
     if (!store) {
+      this.updateStatusBar(undefined);
       return;
     }
 
     const uri = editor.document.uri;
     if (uri.scheme !== 'file') {
+      this.updateStatusBar(undefined);
       return;
     }
 
     const rel = store.toWorkspaceRelative(uri);
     if (!rel || store.isUnderDocsPath(rel)) {
+      this.updateStatusBar(undefined);
       return;
     }
 
     if (!(await store.exists())) {
+      this.updateStatusBar(undefined);
       return;
     }
 
     const index = await store.read();
     const forFile = store.findBindingsForTarget(index, rel);
     if (!forFile.length) {
+      this.updateStatusBar(undefined);
       // Always leave the previous doc; otherwise switching package.json → package-lock.json
       // (and other skip-list files) keeps showing the old binding.
-      await this.showUnbound(rel, forceFocus, shouldOfferBind(rel));
+      await this.showUnbound(rel, forceFocus, shouldOfferBind(rel, store));
       return;
     }
 
+    this.updateStatusBar(forFile.length);
     const line = editor.selection.active.line + 1;
     const binding =
       store.resolveBindingForLine(index, rel, line) ??
@@ -223,6 +237,16 @@ export class SplitSync {
       forFile[0];
 
     await this.openDoc(store, binding, forceFocus);
+  }
+
+  private updateStatusBar(bindingCount: number | undefined): void {
+    if (!bindingCount) {
+      this.statusBar.hide();
+      return;
+    }
+    this.statusBar.text =
+      bindingCount > 1 ? `$(book) CIM (${bindingCount})` : '$(book) CIM 文档';
+    this.statusBar.show();
   }
 
   private async showUnbound(
@@ -275,22 +299,8 @@ export class SplitSync {
   }
 }
 
-function shouldOfferBind(rel: string): boolean {
-  const skipPrefixes = [
-    'node_modules/',
-    'out/',
-    'dist/',
-    '.git/',
-    'media/vditor/',
-    '.vscode/',
-  ];
-  if (skipPrefixes.some((p) => rel.startsWith(p) || rel.includes('/' + p))) {
-    return false;
-  }
-  if (/\.(png|jpe?g|gif|webp|ico|woff2?|ttf|eot|map|vsix)$/i.test(rel)) {
-    return false;
-  }
-  if (rel === 'package-lock.json') {
+function shouldOfferBind(rel: string, store: IndexStore): boolean {
+  if (!isBindableSourceRel(rel, store)) {
     return false;
   }
   const prompt = vscode.workspace

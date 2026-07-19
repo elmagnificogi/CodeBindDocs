@@ -3,6 +3,14 @@ import { DriftIssue } from '../drift/driftChecker';
 import { joinMarkdown, splitMarkdown } from '../store/frontmatter';
 import { IndexStore } from '../store/indexStore';
 import { normalizeRelPath } from '../store/types';
+import { scanBindingCoverage } from '../util/bindableSources';
+import {
+  relativeToDoc,
+  rewriteImagesForDisk,
+  rewriteImagesForWebview,
+  safeAssetFileName,
+} from '../util/docMedia';
+import { collapseDocIncludes, expandDocIncludes } from '../util/docEmbed';
 import { protectHrInFences, unprotectHrInFences } from './mdProtect';
 
 type DocMode = 'ir' | 'source';
@@ -58,10 +66,25 @@ type HostToWeb =
       missing: MissingItem[];
       /** Soft reminders: source changed, check if docs need sync (not mandatory). */
       hints: MissingItem[];
+      /** Binding coverage for bindable sources (shown on home). */
+      coverage?: {
+        boundCount: number;
+        total: number;
+        unbound: string[];
+      };
       canBack: boolean;
       canForward: boolean;
     }
-  | { type: 'warmIr' };
+  | { type: 'warmIr' }
+  | {
+      type: 'assetSaved';
+      requestId: string;
+      ok: boolean;
+      /** Relative Markdown image syntax path from the current doc. */
+      mdPath?: string;
+      previewSrc?: string;
+      error?: string;
+    };
 
 type WebToHost =
   | { type: 'ready' }
@@ -77,7 +100,15 @@ type WebToHost =
   | { type: 'rebindDoc'; docRel: string }
   | { type: 'retightenRange'; docRel: string }
   | { type: 'refreshHash'; docRel: string }
-  | { type: 'refreshAllHashes' };
+  | { type: 'refreshAllHashes' }
+  | {
+      type: 'saveAsset';
+      requestId: string;
+      fileName: string;
+      /** Base64 payload (no data: prefix). */
+      base64: string;
+      mime?: string;
+    };
 
 type NavEntry =
   | { kind: 'home' }
@@ -101,6 +132,8 @@ export class MarkdownPane {
   private history: NavEntry[] = [];
   private historyIndex = -1;
   private navigatingHistory = false;
+  /** webview image URI → path relative to current doc (for save). */
+  private imageUriReverse = new Map<string, string>();
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -347,6 +380,9 @@ export class MarkdownPane {
     const missing: MissingItem[] = [];
     const hints: MissingItem[] = [];
     let docsPath = 'docs';
+    let coverage:
+      | { boundCount: number; total: number; unbound: string[] }
+      | undefined;
     if (store) {
       docsPath = store.docsPath;
       if (await store.exists()) {
@@ -368,6 +404,16 @@ export class MarkdownPane {
           title: 'cim-index.md',
           kind: 'index',
         });
+        try {
+          const report = await scanBindingCoverage(store, index);
+          coverage = {
+            boundCount: report.boundCount,
+            total: report.total,
+            unbound: report.unbound.slice(0, 80),
+          };
+        } catch {
+          // coverage is optional on home
+        }
       }
     }
 
@@ -405,6 +451,7 @@ export class MarkdownPane {
       docs,
       missing,
       hints,
+      coverage,
       ...this.navFlags(),
     } satisfies HostToWeb);
   }
@@ -437,7 +484,10 @@ export class MarkdownPane {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'media')],
+        localResourceRoots: [
+          vscode.Uri.joinPath(this.extensionUri, 'media'),
+          ...(vscode.workspace.workspaceFolders?.map((f) => f.uri) ?? []),
+        ],
       }
     );
 
@@ -532,6 +582,10 @@ export class MarkdownPane {
         });
         return;
       }
+      if (msg.type === 'saveAsset') {
+        await this.handleSaveAsset(msg);
+        return;
+      }
       if (msg.type === 'switchMode') {
         // Webview already switched locally; only persist preference + content.
         if (typeof msg.markdown === 'string' && this.currentUri) {
@@ -599,11 +653,28 @@ export class MarkdownPane {
           // ignore
         }
       }
+      const protectedBody = protectHrInFences(body);
+      let withEmbeds = protectedBody;
+      if (store && docRel) {
+        try {
+          withEmbeds = await expandDocIncludes(protectedBody, store, docRel);
+        } catch {
+          withEmbeds = protectedBody;
+        }
+      }
+      let markdownForWeb = withEmbeds;
+      this.imageUriReverse = new Map();
+      if (store && docRel && this.panel) {
+        const rewritten = rewriteImagesForWebview(withEmbeds, docRel, (workspaceRel) =>
+          this.panel!.webview.asWebviewUri(store.workspaceUri(workspaceRel)).toString()
+        );
+        markdownForWeb = rewritten.markdown;
+        this.imageUriReverse = rewritten.reverse;
+      }
       const payload: HostToWeb = {
         type: 'load',
         title,
-        // Protect bare --- inside code fences so Vditor IR does not stall.
-        markdown: protectHrInFences(body),
+        markdown: markdownForWeb,
         mode: this.mode,
         docRel,
         deletable,
@@ -626,13 +697,85 @@ export class MarkdownPane {
     }, 400);
   }
 
+  private async handleSaveAsset(msg: {
+    requestId: string;
+    fileName: string;
+    base64: string;
+    mime?: string;
+  }): Promise<void> {
+    const store = this.getStore();
+    const fail = async (error: string) => {
+      await this.panel?.webview.postMessage({
+        type: 'assetSaved',
+        requestId: msg.requestId,
+        ok: false,
+        error,
+      } satisfies HostToWeb);
+    };
+    if (!store || !this.panel || !this.currentUri) {
+      await fail('当前没有打开的文档');
+      return;
+    }
+    const docRel = store.toWorkspaceRelative(this.currentUri);
+    if (!docRel || !store.isUnderDocsPath(docRel)) {
+      await fail('仅绑定文档可保存资源');
+      return;
+    }
+    try {
+      const extFromMime =
+        msg.mime === 'image/jpeg'
+          ? 'jpg'
+          : msg.mime === 'image/gif'
+            ? 'gif'
+            : msg.mime === 'image/webp'
+              ? 'webp'
+              : msg.mime === 'image/svg+xml'
+                ? 'svg'
+                : 'png';
+      const fileName = safeAssetFileName(msg.fileName || `paste.${extFromMime}`, extFromMime);
+      await vscode.workspace.fs.createDirectory(store.assetsUri);
+      let assetRel = normalizeRelPath(`${store.assetsPath}/${fileName}`);
+      let dest = store.workspaceUri(assetRel);
+      let n = 0;
+      while (true) {
+        try {
+          await vscode.workspace.fs.stat(dest);
+          n += 1;
+          const stem = fileName.replace(/(\.[^.]+)?$/, '');
+          const ext = fileName.includes('.') ? fileName.slice(fileName.lastIndexOf('.')) : '';
+          assetRel = normalizeRelPath(`${store.assetsPath}/${stem}-${n}${ext}`);
+          dest = store.workspaceUri(assetRel);
+        } catch {
+          break;
+        }
+      }
+      const buf = Buffer.from(msg.base64, 'base64');
+      await vscode.workspace.fs.writeFile(dest, buf);
+      const mdPath = relativeToDoc(docRel, assetRel).replace(/\\/g, '/');
+      const previewSrc = this.panel.webview.asWebviewUri(dest).toString();
+      this.imageUriReverse.set(previewSrc, mdPath);
+      await this.panel.webview.postMessage({
+        type: 'assetSaved',
+        requestId: msg.requestId,
+        ok: true,
+        mdPath,
+        previewSrc,
+      } satisfies HostToWeb);
+    } catch (err) {
+      const text = err instanceof Error ? err.message : String(err);
+      await fail(text);
+    }
+  }
+
   private async saveBody(body: string): Promise<void> {
     if (!this.currentUri) {
       return;
     }
     this.writing = true;
     try {
-      const cleaned = unprotectHrInFences(body);
+      const cleaned = collapseDocIncludes(
+        rewriteImagesForDisk(unprotectHrInFences(body), this.imageUriReverse)
+      );
       const content = joinMarkdown(
         this.header,
         cleaned.endsWith('\n') ? cleaned : cleaned + '\n'
@@ -656,13 +799,52 @@ export class MarkdownPane {
     const vditorCss = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'media', 'vditor', 'dist', 'index.css')
     );
+    const vditorLute = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this.extensionUri,
+        'media',
+        'vditor',
+        'dist',
+        'js',
+        'lute',
+        'lute.min.js'
+      )
+    );
+    const vditorMethod = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'media', 'vditor', 'dist', 'method.min.js')
+    );
+    const vditorIcons = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this.extensionUri,
+        'media',
+        'vditor',
+        'dist',
+        'js',
+        'icons',
+        'ant.js'
+      )
+    );
+    const vditorI18n = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this.extensionUri,
+        'media',
+        'vditor',
+        'dist',
+        'js',
+        'i18n',
+        'zh_CN.js'
+      )
+    );
+    const outlineEnable = vscode.workspace
+      .getConfiguration('cim')
+      .get<boolean>('docPane.outline', true);
 
     const csp = [
       `default-src 'none'`,
       `style-src ${webview.cspSource} 'unsafe-inline'`,
       `script-src ${webview.cspSource} 'unsafe-inline'`,
       `font-src ${webview.cspSource} data:`,
-      `img-src ${webview.cspSource} https: data:`,
+      `img-src ${webview.cspSource} https: data: blob:`,
       `connect-src ${webview.cspSource}`,
     ].join('; ');
 
@@ -673,6 +855,11 @@ export class MarkdownPane {
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="${vditorCss}" />
+  <link rel="preload" href="${vditorJs}" as="script" />
+  <link rel="preload" href="${vditorLute}" as="script" />
+  <link rel="preload" href="${vditorMethod}" as="script" />
+  <link rel="preload" href="${vditorIcons}" as="script" />
+  <link rel="preload" href="${vditorI18n}" as="script" />
   <style>
     html, body {
       margin: 0; height: 100%; overflow: hidden;
@@ -858,10 +1045,12 @@ export class MarkdownPane {
       background: rgba(127, 127, 127, 0.2);
       color: var(--vscode-descriptionForeground, inherit);
     }
-    #missingSection, #hintSection { margin-bottom: 28px; }
-    #missingSection.hidden-mode, #hintSection.hidden-mode { display: none !important; }
+    #missingSection, #hintSection, #coverageSection { margin-bottom: 28px; }
+    #missingSection.hidden-mode, #hintSection.hidden-mode, #coverageSection.hidden-mode { display: none !important; }
     #missingSection h2 { color: var(--vscode-errorForeground, #f14c4c); }
     #hintSection h2 { font-weight: 600; opacity: 0.9; }
+    #coverageSection .cov-stat { margin: 0 0 10px; font-size: 13px; }
+    #coverageSection .cov-list code { font-size: 12px; }
   </style>
 </head>
 <body>
@@ -888,6 +1077,11 @@ export class MarkdownPane {
   <div id="home">
     <h2>文档主页</h2>
     <p>文档目录 <code id="homeDocsPath"></code> · 点击下方链接打开对应文档</p>
+    <div id="coverageSection" class="hidden-mode">
+      <h2>绑定覆盖率</h2>
+      <p id="coverageStat" class="cov-stat"></p>
+      <ul class="doc-list cov-list" id="coverageList"></ul>
+    </div>
     <div id="missingSection" class="hidden-mode">
       <h2>绑定提醒</h2>
       <p>以下绑定缺失或行范围/符号可能失效，建议处理。</p>
@@ -931,8 +1125,54 @@ export class MarkdownPane {
     const missingList = document.getElementById('missingList');
     const hintSection = document.getElementById('hintSection');
     const hintList = document.getElementById('hintList');
+    const coverageSection = document.getElementById('coverageSection');
+    const coverageStat = document.getElementById('coverageStat');
+    const coverageList = document.getElementById('coverageList');
     const hashBulkRow = document.getElementById('hashBulkRow');
     const btnRefreshAllHashes = document.getElementById('btnRefreshAllHashes');
+    const outlineEnable = ${outlineEnable ? 'true' : 'false'};
+    const assetWaiters = {};
+    let assetReqSeq = 0;
+
+    function requestSaveAsset(file) {
+      return new Promise(function (resolve, reject) {
+        const requestId = 'a' + String(++assetReqSeq);
+        const reader = new FileReader();
+        reader.onerror = function () { reject(new Error('读取文件失败')); };
+        reader.onload = function () {
+          const dataUrl = String(reader.result || '');
+          const comma = dataUrl.indexOf(',');
+          const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+          assetWaiters[requestId] = { resolve: resolve, reject: reject };
+          vscodeApi.postMessage({
+            type: 'saveAsset',
+            requestId: requestId,
+            fileName: file.name || 'paste.png',
+            base64: base64,
+            mime: file.type || ''
+          });
+          setTimeout(function () {
+            if (assetWaiters[requestId]) {
+              delete assetWaiters[requestId];
+              reject(new Error('保存资源超时'));
+            }
+          }, 20000);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function onAssetSaved(msg) {
+      const waiter = assetWaiters[msg.requestId];
+      if (!waiter) return;
+      delete assetWaiters[msg.requestId];
+      if (msg.ok && msg.mdPath) {
+        waiter.resolve({ mdPath: msg.mdPath, previewSrc: msg.previewSrc || '' });
+      } else {
+        waiter.reject(new Error(msg.error || '保存失败'));
+      }
+    }
+
     btnRefreshAllHashes.addEventListener('click', function () {
       vscodeApi.postMessage({ type: 'refreshAllHashes' });
     });
@@ -1054,7 +1294,7 @@ export class MarkdownPane {
       parent.appendChild(btn);
     }
 
-    function showHome(docsPath, docs, missing, hints, canBack, canForward) {
+    function showHome(docsPath, docs, missing, hints, canBack, canForward, coverage) {
       hideAll();
       currentDocRel = '';
       setDeleteVisible(false);
@@ -1063,6 +1303,53 @@ export class MarkdownPane {
       docList.innerHTML = '';
       missingList.innerHTML = '';
       hintList.innerHTML = '';
+      coverageList.innerHTML = '';
+
+      if (coverage && coverage.total > 0) {
+        coverageSection.classList.remove('hidden-mode');
+        const pct = coverage.total
+          ? Math.round((coverage.boundCount / coverage.total) * 100)
+          : 0;
+        coverageStat.textContent =
+          '已绑定 ' + coverage.boundCount + ' / ' + coverage.total
+          + ' 个源文件（' + pct + '%）';
+        const unbound = coverage.unbound || [];
+        if (!unbound.length) {
+          const li = document.createElement('li');
+          li.textContent = '全部可绑定源文件均已覆盖。';
+          coverageList.appendChild(li);
+        } else {
+          unbound.forEach(function (path) {
+            const li = document.createElement('li');
+            const card = document.createElement('div');
+            card.className = 'hint-card';
+            const title = document.createElement('code');
+            title.textContent = path;
+            const actions = document.createElement('div');
+            actions.className = 'actions';
+            appendBtn(actions, '新建绑定', null, function () {
+              vscodeApi.postMessage({ type: 'createBind', sourceRel: path });
+            });
+            appendBtn(actions, '打开源文件', 'secondary', function () {
+              vscodeApi.postMessage({ type: 'openTarget', sourceRel: path });
+            });
+            card.appendChild(title);
+            card.appendChild(actions);
+            li.appendChild(card);
+            coverageList.appendChild(li);
+          });
+          if (coverage.boundCount + unbound.length < coverage.total) {
+            const more = document.createElement('li');
+            more.style.opacity = '0.7';
+            more.style.fontSize = '12px';
+            more.textContent = '列表已截断，共 '
+              + (coverage.total - coverage.boundCount) + ' 个未绑定。';
+            coverageList.appendChild(more);
+          }
+        }
+      } else {
+        coverageSection.classList.add('hidden-mode');
+      }
 
       const missingItems = missing || [];
       if (missingItems.length) {
@@ -1416,18 +1703,37 @@ export class MarkdownPane {
         value: initialValue || '',
         cdn: '${vditorRoot}',
         cache: { enable: false },
+        lang: 'zh_CN',
+        outline: { enable: outlineEnable, position: 'right' },
         toolbarConfig: { pin: true, hide: false },
         toolbar: [
           'headings', 'bold', 'italic', 'strike', '|',
           'list', 'ordered-list', 'check', '|',
-          'quote', 'code', 'inline-code', 'link', 'table', '|',
-          'undo', 'redo'
+          'quote', 'code', 'inline-code', 'link', 'table', 'upload', '|',
+          'undo', 'redo', '|', 'outline'
         ],
         theme: isDark() ? 'dark' : 'classic',
         preview: {
           theme: { current: isDark() ? 'dark' : 'light' },
           // hljs is expensive on first paint; plain IR is enough for docs.
           hljs: { enable: false }
+        },
+        upload: {
+          accept: 'image/*',
+          handler: function (files) {
+            const list = Array.prototype.slice.call(files || []);
+            if (!list.length) return null;
+            return Promise.all(list.map(function (f) { return requestSaveAsset(f); }))
+              .then(function (results) {
+                return results.map(function (r) {
+                  return '![](' + (r.previewSrc || r.mdPath) + ')';
+                }).join('\\n');
+              })
+              .catch(function (err) {
+                console.warn(err);
+                return '';
+              });
+          }
         },
         after: function () {
           applying = false;
@@ -1547,6 +1853,35 @@ export class MarkdownPane {
       vscodeApi.postMessage({ type: 'markdownChanged', markdown: pendingMarkdown });
     });
 
+    mdSource.addEventListener('paste', function (e) {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      const files = [];
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (it.kind === 'file' && it.type && it.type.indexOf('image/') === 0) {
+          const f = it.getAsFile();
+          if (f) files.push(f);
+        }
+      }
+      if (!files.length) return;
+      e.preventDefault();
+      Promise.all(files.map(function (f) { return requestSaveAsset(f); }))
+        .then(function (results) {
+          const insert = results.map(function (r) {
+            return '![](' + r.mdPath + ')';
+          }).join('\\n');
+          const start = mdSource.selectionStart || 0;
+          const end = mdSource.selectionEnd || 0;
+          const before = mdSource.value.slice(0, start);
+          const after = mdSource.value.slice(end);
+          mdSource.value = before + insert + after;
+          pendingMarkdown = mdSource.value;
+          vscodeApi.postMessage({ type: 'markdownChanged', markdown: pendingMarkdown });
+        })
+        .catch(function (err) { console.warn(err); });
+    });
+
     btnIr.addEventListener('click', function () {
       switchModeLocal('ir');
     });
@@ -1597,6 +1932,10 @@ export class MarkdownPane {
         showUnbound(msg.sourceRel || '', msg.canBack, msg.canForward, msg.canCreate !== false);
         return;
       }
+      if (msg.type === 'assetSaved') {
+        onAssetSaved(msg);
+        return;
+      }
       if (msg.type === 'home') {
         showHome(
           msg.docsPath,
@@ -1604,7 +1943,8 @@ export class MarkdownPane {
           msg.missing || [],
           msg.hints || [],
           msg.canBack,
-          msg.canForward
+          msg.canForward,
+          msg.coverage || null
         );
         return;
       }

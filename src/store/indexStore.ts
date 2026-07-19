@@ -277,19 +277,35 @@ export class IndexStore {
     return uri;
   }
 
-  async updateTargetPath(oldPath: string, newPath: string): Promise<boolean> {
+  /**
+   * Update `cim.target` after a rename.
+   * Matches exact path, and also directory prefix (`src/foo` → `src/bar`
+   * updates `src/foo/a.ts` → `src/bar/a.ts`).
+   * @returns number of bindings updated
+   */
+  async updateTargetPath(oldPath: string, newPath: string): Promise<number> {
     const index = await this.read();
-    const oldNorm = normalizeRelPath(oldPath);
-    const newNorm = normalizeRelPath(newPath);
-    let changed = false;
+    const oldNorm = normalizeRelPath(oldPath).replace(/\/+$/, '');
+    const newNorm = normalizeRelPath(newPath).replace(/\/+$/, '');
+    if (!oldNorm || oldNorm === newNorm) {
+      return 0;
+    }
+    let updated = 0;
     for (const binding of index.bindings) {
-      if (normalizeRelPath(binding.target.path) === oldNorm) {
-        binding.target.path = newNorm;
+      const cur = normalizeRelPath(binding.target.path);
+      let next: string | undefined;
+      if (cur === oldNorm) {
+        next = newNorm;
+      } else if (cur.startsWith(oldNorm + '/')) {
+        next = newNorm + cur.slice(oldNorm.length);
+      }
+      if (next && next !== cur) {
+        binding.target.path = next;
         await this.writeBinding(binding);
-        changed = true;
+        updated += 1;
       }
     }
-    return changed;
+    return updated;
   }
 
   toWorkspaceRelative(uri: vscode.Uri): string | undefined {
