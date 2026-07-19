@@ -47,6 +47,18 @@ export class IndexStore {
     return `${this.docsPath}/assets`;
   }
 
+  /**
+   * Workspace-relative folder for new-doc Markdown templates.
+   * Empty setting → `{docsPath}/_templates`.
+   */
+  get templatesPath(): string {
+    const raw = vscode.workspace.getConfiguration('cim').get<string>('templatesPath', '');
+    if (raw?.trim()) {
+      return normalizeRelPath(raw).replace(/\/+$/, '');
+    }
+    return `${this.docsPath}/_templates`;
+  }
+
   /** Workspace-relative path of the generated index page. */
   get indexDocPath(): string {
     return `${this.docsPath}/${INDEX_FILE_NAME}`;
@@ -103,6 +115,7 @@ export class IndexStore {
   async ensureLayout(): Promise<void> {
     await vscode.workspace.fs.createDirectory(this.docsUri);
     await vscode.workspace.fs.createDirectory(this.assetsUri);
+    await vscode.workspace.fs.createDirectory(this.workspaceUri(this.templatesPath));
   }
 
   /** Scan Markdown docs and build bindings from `cim:` frontmatter. */
@@ -115,6 +128,7 @@ export class IndexStore {
     const index = emptyIndex();
     const docsRoot = this.docsPath;
     const indexPath = this.indexDocPath;
+    const templatesRoot = this.templatesPath;
 
     const files = await vscode.workspace.findFiles(
       new vscode.RelativePattern(this.workspaceFolder, `${docsRoot}/**/*.md`)
@@ -126,6 +140,13 @@ export class IndexStore {
         continue;
       }
       if (relFromRoot === indexPath) {
+        continue;
+      }
+      // Never treat template files as bindings.
+      if (
+        relFromRoot === templatesRoot ||
+        relFromRoot.startsWith(templatesRoot + '/')
+      ) {
         continue;
       }
       try {

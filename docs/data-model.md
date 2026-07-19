@@ -3,7 +3,7 @@ cim:
   target: src/store/indexStore.ts
   kind: file
   symbol: IndexStore
-  contentHash: 4beab559bf14
+  contentHash: 40bd86a254d0
 ---
 # indexStore.ts / 数据模型
 
@@ -14,6 +14,7 @@ docs/                 # 默认文档目录（cim.docsPath）
   *.md                # 带 cim: 文件头的绑定文档
   cim-index.md        # 自动生成的汇总
   assets/             # 可选媒体（cim.assetsPath 可覆盖）
+  _templates/         # 新建文档模板（cim.templatesPath 可覆盖）
 docs/REQUIREMENTS.md  # 普通文档（无 cim: 头，不算绑定）
 ```
 
@@ -21,6 +22,7 @@ docs/REQUIREMENTS.md  # 普通文档（无 cim: 头，不算绑定）
 
 - `cim.docsPath`：文档根目录，默认 `docs`
 - `cim.assetsPath`：资源目录，空则 `{docsPath}/assets`
+- `cim.templatesPath`：新建文档模板目录，空则 `{docsPath}/_templates`
 
 ## 绑定声明（文件头）
 

@@ -1,6 +1,6 @@
 # CIM 文档汇总
 
-共 **13** 个绑定。由 CIM 自动生成，请勿手改（绑定变更后会覆盖）。
+共 **16** 个绑定。由 CIM 自动生成，请勿手改（绑定变更后会覆盖）。
 
 文档目录：`docs/`（设置项 `cim.docsPath`）。
 
@@ -16,7 +16,10 @@
 | [`src/store/indexStore.ts`](../src/store/indexStore.ts) | [`docs/data-model.md`](./data-model.md) | file |
 | [`src/store/types.ts`](../src/store/types.ts) | [`docs/store-types.md`](./store-types.md) | file |
 | [`src/sync/splitSync.ts`](../src/sync/splitSync.ts) | [`docs/split-sync.md`](./split-sync.md) | file |
+| [`src/util/docTemplates.ts`](../src/util/docTemplates.ts) | [`docs/util-docTemplates.md`](./util-docTemplates.md) | file |
+| [`src/util/rangeOverlap.ts`](../src/util/rangeOverlap.ts) | [`docs/util-rangeOverlap.md`](./util-rangeOverlap.md) | file |
 | [`src/util/rangePicker.ts`](../src/util/rangePicker.ts) | [`docs/util-rangePicker.md`](./util-rangePicker.md) | file |
+| [`src/util/symbolRange.ts`](../src/util/symbolRange.ts) | [`docs/util-symbolRange.md`](./util-symbolRange.md) | file |
 | [`src/views/cimCodeLens.ts`](../src/views/cimCodeLens.ts) | [`docs/views-codelens.md`](./views-codelens.md) | file |
 | [`src/views/cimTreeProvider.ts`](../src/views/cimTreeProvider.ts) | [`docs/views-tree.md`](./views-tree.md) | file |
 | [`src/webview/markdownPane.ts`](../src/webview/markdownPane.ts) | [`docs/webview-markdownPane.md`](./webview-markdownPane.md) | file |

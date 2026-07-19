@@ -3,7 +3,7 @@ cim:
   target: src/extension.ts
   kind: file
   symbol: activate
-  contentHash: 633f7f5e75e1
+  contentHash: a21da3c2434c
 ---
 # extension.ts
 

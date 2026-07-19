@@ -11,7 +11,7 @@ import {
   pickLineRangeInEditor,
   registerRangePickerCommands,
 } from './util/rangePicker';
-import { DOC_TEMPLATES, docBodyFromTemplate } from './util/docTemplates';
+import { applyDocTemplate, ensureDefaultTemplates, listDocTemplates } from './util/docTemplates';
 import { findOverlapsWithExisting } from './util/rangeOverlap';
 
 let splitSync: SplitSync | undefined;
@@ -115,6 +115,7 @@ async function initialize(getStore: () => IndexStore | undefined): Promise<void>
 
   await store.ensureLayout();
   await scaffoldAgentFiles(store.workspaceFolder.uri);
+  const templatesWritten = await ensureDefaultTemplates(store);
 
   const index = await store.read();
   if (index.bindings.length === 0) {
@@ -145,8 +146,12 @@ cim:
   await store.writeDocsIndex();
   treeProvider?.refresh();
   await driftChecker?.scanAll();
+  const extra =
+    templatesWritten > 0
+      ? ` 已写入 ${templatesWritten} 个默认模板到 \`${store.templatesPath}/\`。`
+      : ` 模板目录：\`${store.templatesPath}/\`。`;
   void vscode.window.showInformationMessage(
-    `CIM: 已初始化文档目录 \`${store.docsPath}/\` 与 Agent 脚手架。`
+    `CIM: 已初始化文档目录 \`${store.docsPath}/\` 与 Agent 脚手架。${extra}`
   );
 }
 
@@ -191,6 +196,8 @@ async function bindCurrentFile(
 
   await store.ensureLayout();
   await scaffoldAgentFiles(store.workspaceFolder.uri);
+  // Ensure editable templates exist before the user picks one.
+  await ensureDefaultTemplates(store);
 
   // Warm Vditor while the user picks bind options (biggest first-open cost).
   void splitSync?.warmEditor();
@@ -316,13 +323,17 @@ async function bindCurrentFile(
     return;
   }
 
+  const templates = await listDocTemplates(store);
   const templatePick = await vscode.window.showQuickPick(
-    DOC_TEMPLATES.map((t) => ({
+    templates.map((t) => ({
       label: t.label,
       description: t.description,
-      id: t.id,
+      detail: t.sourceRel ? t.sourceRel : '内置模板',
+      template: t,
     })),
-    { placeHolder: '选择文档模板' }
+    {
+      placeHolder: `选择文档模板（可编辑 ${store.templatesPath}/）`,
+    }
   );
   if (!templatePick) {
     return;
@@ -350,7 +361,7 @@ async function bindCurrentFile(
     await store.writeBinding(binding, {
       refreshIndex: false,
       title,
-      body: docBodyFromTemplate(templatePick.id, title),
+      body: applyDocTemplate(templatePick.template.body, title),
     });
   };
   if (driftChecker) {

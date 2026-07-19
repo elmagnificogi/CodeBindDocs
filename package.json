@@ -148,6 +148,11 @@
           "default": "",
           "description": "Workspace-relative folder for doc assets. Empty = {docsPath}/assets"
         },
+        "cim.templatesPath": {
+          "type": "string",
+          "default": "",
+          "description": "Workspace-relative folder for new-doc Markdown templates ({{title}} placeholder). Empty = {docsPath}/_templates. If the folder has .md files they are used; otherwise built-in templates apply."
+        },
         "cim.splitSync.enabled": {
           "type": "boolean",
           "default": true,

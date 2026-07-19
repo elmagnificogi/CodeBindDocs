@@ -8,6 +8,7 @@
 - `docs/*.md` — 设计文档；**绑定写在 Markdown YAML 文件头**
 - `docs/cim-index.md` — 全部绑定的汇总目录（自动生成）
 - `docs/assets/` — 可选媒体（可用 `cim.assetsPath` 覆盖）
+- `docs/_templates/` — 新建文档模板（可用 `cim.templatesPath` 覆盖；支持 `{{title}}`）
 - `docs/REQUIREMENTS.md` — 产品需求（无绑定头）
 
 ## 模块文档（源码 → 文档）
