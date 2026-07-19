@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.2] - 2026-07-19
+
+### Changed
+
+- 更新 Marketplace README 截图（第二张改为仓库内图）
+
 ## [0.1.1] - 2026-07-19
 
 ### Changed

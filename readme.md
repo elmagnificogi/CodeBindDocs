@@ -2,7 +2,7 @@
 
 ![image-20260719232659382](https://img.elmagnifico.tech/static/upload/elmagnifico/202607192327543.png)
 
-![](https://img.elmagnifico.tech/static/upload/elmagnifico/202607192327640.png)
+![split sync](media/screenshots/split-sync.png)
 
 **旁路绑定的代码文档扩展**（VS Code / Cursor）：源码零侵入，文档落在仓库 Markdown 里，打开代码时左右分栏同步查看与编辑。适合人与 AI Agent 共用同一套设计上下文。
 
