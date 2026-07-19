@@ -51,6 +51,15 @@
         "command": "cim.openDocsIndex",
         "title": "CIM: Open Docs Index",
         "icon": "$(book)"
+      },
+      {
+        "command": "cim.deleteDoc",
+        "title": "CIM: Delete Bound Doc",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "cim.rebindDoc",
+        "title": "CIM: Rebind Doc to Source"
       }
     ],
     "viewsContainers": {
@@ -93,6 +102,16 @@
           "command": "cim.openDoc",
           "when": "view == cim.bindings && viewItem == binding",
           "group": "inline"
+        },
+        {
+          "command": "cim.deleteDoc",
+          "when": "view == cim.bindings && viewItem == binding",
+          "group": "1_modification"
+        },
+        {
+          "command": "cim.rebindDoc",
+          "when": "view == cim.bindings && viewItem == binding",
+          "group": "1_modification"
         }
       ]
     },
@@ -132,14 +151,14 @@
           "type": "string",
           "enum": [
             "ir",
-            "sv"
+            "source"
           ],
           "default": "ir",
           "enumDescriptions": [
             "Instant Rendering (Typora-like: type Markdown, render live)",
-            "Split view source + preview"
+            "Plain Markdown source (textarea)"
           ],
-          "description": "Markdown pane mode. ir = Typora-like instant rendering; sv = source/preview split."
+          "description": "Markdown pane mode. ir = Typora-like instant rendering; source = plain Markdown text."
         }
       }
     }

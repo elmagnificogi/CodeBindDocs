@@ -22,9 +22,22 @@ export class BindingItem extends vscode.TreeItem {
   constructor(public readonly binding: Binding) {
     super(normalizeRelPath(binding.target.path), vscode.TreeItemCollapsibleState.None);
     this.contextValue = 'binding';
-    this.description = binding.doc;
+    if (
+      binding.target.kind === 'range' &&
+      typeof binding.target.startLine === 'number' &&
+      typeof binding.target.endLine === 'number'
+    ) {
+      const sym = binding.anchors?.[0]?.symbol;
+      this.description = `${binding.doc}  L${binding.target.startLine}-${binding.target.endLine}${
+        sym ? ` · ${sym}` : ''
+      }`;
+    } else {
+      this.description = binding.doc;
+    }
     this.tooltip = `${binding.target.path} → ${binding.doc}`;
-    this.iconPath = new vscode.ThemeIcon('link');
+    this.iconPath = new vscode.ThemeIcon(
+      binding.target.kind === 'range' ? 'symbol-method' : 'link'
+    );
     this.command = {
       command: 'cim.openTarget',
       title: 'Open Source',

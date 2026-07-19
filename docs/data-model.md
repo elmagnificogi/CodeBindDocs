@@ -3,7 +3,7 @@ cim:
   target: src/store/indexStore.ts
   kind: file
   symbol: IndexStore
-  contentHash: 2ee62344d549
+  contentHash: 0c6ab95e10df
 ---
 # indexStore.ts / 数据模型
 
@@ -24,34 +24,39 @@ docs/REQUIREMENTS.md  # 普通文档（无 cim: 头，不算绑定）
 
 ## 绑定声明（文件头）
 
+文档**文件最开头**用三连短横线包裹 YAML。正文示例勿再写裸分隔线（Vditor IR 会卡顿）。
+
+### 整文件
+
 ```yaml
----
 cim:
   target: src/foo.ts
   kind: file
-  startLine: 10
-  endLine: 20
-  symbol: activate
   contentHash: abc
----
 ```
 
-## 识别流程
+### 代码块（行范围）
 
-1. 扫描 `{docsPath}/**/*.md`
-2. 解析开头 `---` … `---` 中的 `cim:` 块
-3. 用 `cim.target`（相对工作区、正斜杠）匹配源文件
-4. 文档路径为工作区相对路径（如 `docs/foo.md`）
+```yaml
+cim:
+  target: src/foo.ts
+  kind: range
+  startLine: 15
+  endLine: 44
+  symbol: activate
+  contentHash: abc
+```
+
+同一源文件可有多篇：多个 `range` + 至多一个 `file`。光标行优先最窄 range，否则回退 file。
 
 ## IndexStore 职责
 
-- 确保目录结构
-- 扫描并缓存绑定
-- 写回/更新 Markdown 文件头
-- 改名时更新 `cim.target`
-- 生成 `cim-index.md`
+- 扫描/缓存绑定；`writeBinding` / `deleteDoc` / `createDocIfMissing`
+- 改名更新 `cim.target`；生成 `cim-index.md`
+- `resolveBindingForLine` 供分栏与 CodeLens
 
 ## 约束
 
-- CIM 绝不修改被绑定的源码文件。
-- 无 `cim:` 文件头的 Markdown 不算绑定。
+- 绝不修改被绑定的源码文件
+- 无 `cim:` 文件头的 Markdown 不算绑定
+- 不能删除自动生成的 `cim-index.md`

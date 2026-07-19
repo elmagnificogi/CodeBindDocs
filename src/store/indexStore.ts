@@ -165,6 +165,29 @@ export class IndexStore {
     await this.writeDocsIndex();
   }
 
+  /**
+   * Delete a bound Markdown doc file and refresh `cim-index.md`.
+   * Refuses to delete the generated index page itself.
+   */
+  async deleteDoc(docWorkspaceRel: string): Promise<void> {
+    const rel = normalizeRelPath(docWorkspaceRel);
+    if (!this.isUnderDocsPath(rel)) {
+      throw new Error(`文档不在文档目录内: ${rel}`);
+    }
+    if (this.isIndexDoc(rel)) {
+      throw new Error('不能删除自动生成的 cim-index.md');
+    }
+    const uri = this.docUri(rel);
+    try {
+      await vscode.workspace.fs.delete(uri, { useTrash: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`删除失败: ${msg}`);
+    }
+    this.invalidateCache();
+    await this.writeDocsIndex();
+  }
+
   /** Generate `{docsPath}/cim-index.md` — overview of all bindings. */
   async writeDocsIndex(): Promise<vscode.Uri> {
     await this.ensureLayout();
@@ -187,7 +210,17 @@ export class IndexStore {
     for (const b of index.bindings) {
       const srcLink = relativeMarkdownLink(indexPath, b.target.path);
       const docLink = relativeMarkdownLink(indexPath, b.doc);
-      const kind = b.target.kind === 'range' ? 'range' : 'file';
+      let kind = b.target.kind === 'range' ? 'range' : 'file';
+      if (
+        b.target.kind === 'range' &&
+        typeof b.target.startLine === 'number' &&
+        typeof b.target.endLine === 'number'
+      ) {
+        const sym = b.anchors?.[0]?.symbol;
+        kind = sym
+          ? `range L${b.target.startLine}-${b.target.endLine} (${sym})`
+          : `range L${b.target.startLine}-${b.target.endLine}`;
+      }
       lines.push(
         `| [\`${b.target.path}\`](${srcLink}) | [\`${b.doc}\`](${docLink}) | ${kind} |`
       );
@@ -200,7 +233,8 @@ export class IndexStore {
     lines.push('', '## 快捷操作', '');
     lines.push('- 命令面板：`CIM: Open Docs Index` 打开本页');
     lines.push('- 命令面板：`CIM: Bind Doc to Current File` 为当前源文件创建绑定');
-    lines.push('- 侧栏 **CIM → Bindings** 可跳转源码 / 文档');
+    lines.push('- 命令面板：`CIM: Delete Bound Doc` 删除绑定文档');
+    lines.push('- 侧栏 **CIM → Bindings** 可跳转源码 / 文档 / 删除');
     lines.push('');
 
     const uri = this.docUri(indexPath);
@@ -232,8 +266,49 @@ export class IndexStore {
   }
 
   findByTargetPath(index: CimIndex, targetPath: string): Binding | undefined {
+    const all = this.findBindingsForTarget(index, targetPath);
+    return all.find((b) => b.target.kind === 'file') ?? all[0];
+  }
+
+  findBindingsForTarget(index: CimIndex, targetPath: string): Binding[] {
     const norm = normalizeRelPath(targetPath);
-    return index.bindings.find((b) => normalizeRelPath(b.target.path) === norm);
+    return index.bindings.filter((b) => normalizeRelPath(b.target.path) === norm);
+  }
+
+  /**
+   * Prefer the tightest range covering `line1Based`, else file-level binding.
+   */
+  resolveBindingForLine(
+    index: CimIndex,
+    targetPath: string,
+    line1Based: number
+  ): Binding | undefined {
+    const forFile = this.findBindingsForTarget(index, targetPath);
+    if (!forFile.length) {
+      return undefined;
+    }
+
+    const covering = forFile
+      .filter(
+        (b) =>
+          b.target.kind === 'range' &&
+          typeof b.target.startLine === 'number' &&
+          typeof b.target.endLine === 'number' &&
+          line1Based >= b.target.startLine &&
+          line1Based <= b.target.endLine
+      )
+      .sort(
+        (a, b) =>
+          a.target.endLine! -
+          a.target.startLine! -
+          (b.target.endLine! - b.target.startLine!)
+      );
+
+    if (covering.length) {
+      return covering[0];
+    }
+
+    return forFile.find((b) => b.target.kind === 'file');
   }
 
   findByDocPath(index: CimIndex, docPath: string): Binding | undefined {
@@ -298,7 +373,7 @@ export class IndexStore {
 }
 
 function defaultDocBody(title: string): string {
-  return `# ${title}\n\n## 概述\n\n_在此描述设计意图、约束与不变量。_\n\n## 备注\n\n-\n`;
+  return `# ${title}\n\n## 概述\n\n在此描述设计意图、约束与不变量。\n\n## 备注\n\n-\n`;
 }
 
 /** Relative link from one workspace file to another (POSIX). */

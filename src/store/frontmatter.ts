@@ -11,21 +11,35 @@ export interface CimFrontmatter {
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
-/** Split raw header (including fences) from body so edits can preserve YAML as-is. */
+function stripBom(markdown: string): string {
+  return markdown.replace(/^\uFEFF/, '');
+}
+
+/**
+ * Split raw header (including fences) from body so edits can preserve YAML as-is.
+ * Strips BOM and any nested/duplicate leading frontmatter blocks from the body
+ * (nested FM would show up as a YAML "code block" in Vditor IR).
+ */
 export function splitMarkdown(markdown: string): { header: string | undefined; body: string } {
-  const match = FRONTMATTER_RE.exec(markdown);
+  let text = stripBom(markdown);
+  const match = FRONTMATTER_RE.exec(text);
   if (!match) {
-    return { header: undefined, body: markdown };
+    return { header: undefined, body: text };
   }
   let header = match[0];
   if (!header.endsWith('\n')) {
     header += '\n';
   }
-  return { header, body: markdown.slice(match[0].length) };
+  let body = text.slice(match[0].length);
+  // Remove accidental duplicate frontmatter left in body
+  while (FRONTMATTER_RE.test(body)) {
+    body = body.replace(FRONTMATTER_RE, '');
+  }
+  return { header, body };
 }
 
 export function joinMarkdown(header: string | undefined, body: string): string {
-  const normalized = body.replace(/^\uFEFF/, '');
+  const normalized = stripBom(body);
   if (!header) {
     return normalized;
   }
@@ -37,13 +51,17 @@ export function parseCimFrontmatter(markdown: string): {
   meta: CimFrontmatter | undefined;
   body: string;
 } {
-  const match = FRONTMATTER_RE.exec(markdown);
+  const text = stripBom(markdown);
+  const match = FRONTMATTER_RE.exec(text);
   if (!match) {
-    return { meta: undefined, body: markdown };
+    return { meta: undefined, body: text };
   }
 
   const yaml = match[1];
-  const body = markdown.slice(match[0].length);
+  let body = text.slice(match[0].length);
+  while (FRONTMATTER_RE.test(body)) {
+    body = body.replace(FRONTMATTER_RE, '');
+  }
   const meta = parseCimYaml(yaml);
   return { meta, body };
 }
@@ -129,8 +147,12 @@ export function serializeCimFrontmatter(meta: CimFrontmatter, body: string): str
     lines.push(`  contentHash: ${meta.contentHash}`);
   }
   lines.push('---', '');
-  const normalizedBody = body.replace(/^\uFEFF/, '').replace(/^\r?\n/, '');
-  return lines.join('\n') + normalizedBody;
+  const normalizedBody = stripBom(body).replace(/^\r?\n/, '');
+  // Avoid writing nested --- frontmatter into the body
+  const safeBody = FRONTMATTER_RE.test(normalizedBody)
+    ? parseCimFrontmatter(normalizedBody).body.replace(/^\r?\n/, '')
+    : normalizedBody;
+  return lines.join('\n') + safeBody;
 }
 
 export function frontmatterToBinding(docRelFromCim: string, meta: CimFrontmatter): Binding {

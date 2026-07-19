@@ -9,9 +9,10 @@
 ```text
 src/                 扩展源码
 docs/                CIM 绑定文档 + 产品需求（默认 docsPath）
-AGENTS.md            Agent 入口说明
+AGENTS.md            Agent 入口说明（含模块→文档对照表）
 ```
 
+全部绑定见 [docs/cim-index.md](docs/cim-index.md)。
 ## 开发调试
 
 ```bash
@@ -44,7 +45,7 @@ npm run debug:watch
 2. 命令面板 **`Developer: Install Extension from Location...`**
 3. 选本仓库根目录，然后 **Reload Window**
 
-常用命令：`CIM: Open Docs Index` / `CIM: Initialize` / `CIM: Bind Doc to Current File` / `CIM: Reveal Bound Doc` / `CIM: Toggle Split Sync`。
+常用命令：`CIM: Open Docs Index` / `CIM: Initialize` / `CIM: Bind Doc to Current File` / `CIM: Rebind Doc to Source` / `CIM: Delete Bound Doc` / `CIM: Reveal Bound Doc` / `CIM: Toggle Split Sync`。
 
 ## 背景与竞品
 

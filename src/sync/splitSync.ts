@@ -1,23 +1,27 @@
 import * as vscode from 'vscode';
+import { DriftIssue } from '../drift/driftChecker';
 import { IndexStore } from '../store/indexStore';
 import { Binding, normalizeRelPath } from '../store/types';
 import { MarkdownPane } from '../webview/markdownPane';
 
 /**
  * Keeps a Typora-like Markdown pane open beside the active source file when a binding exists.
- * When unbound, shows an empty state with a create-binding button.
+ * Supports file-level and range (code-block) YAML bindings; cursor line picks the tightest range.
  */
 export class SplitSync {
   private enabled = true;
   private syncing = false;
   private readonly pane: MarkdownPane;
   private readonly disposables: vscode.Disposable[] = [];
+  private selectionTimer: NodeJS.Timeout | undefined;
 
   constructor(
     private readonly getStore: () => IndexStore | undefined,
-    extensionUri: vscode.Uri
+    extensionUri: vscode.Uri,
+    getDriftIssues: () => DriftIssue[] = () => [],
+    refreshDrift: () => Promise<void> = async () => undefined
   ) {
-    this.pane = new MarkdownPane(extensionUri);
+    this.pane = new MarkdownPane(extensionUri, getStore, getDriftIssues, refreshDrift);
     const cfg = vscode.workspace.getConfiguration('cim');
     this.enabled = cfg.get<boolean>('splitSync.enabled', true);
 
@@ -25,6 +29,17 @@ export class SplitSync {
       this.pane,
       vscode.window.onDidChangeActiveTextEditor((editor) => {
         void this.onActiveEditor(editor);
+      }),
+      vscode.window.onDidChangeTextEditorSelection((e) => {
+        if (e.textEditor !== vscode.window.activeTextEditor) {
+          return;
+        }
+        if (this.selectionTimer) {
+          clearTimeout(this.selectionTimer);
+        }
+        this.selectionTimer = setTimeout(() => {
+          void this.syncForEditor(e.textEditor, false);
+        }, 120);
       }),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration('cim.splitSync.enabled')) {
@@ -34,9 +49,16 @@ export class SplitSync {
         }
       })
     );
+
+    // Restored tabs are often already active before listeners attach, so no
+    // onDidChangeActiveTextEditor fires — retry sync after activate.
+    this.scheduleStartupSync();
   }
 
   dispose(): void {
+    if (this.selectionTimer) {
+      clearTimeout(this.selectionTimer);
+    }
     for (const d of this.disposables) {
       d.dispose();
     }
@@ -58,8 +80,22 @@ export class SplitSync {
     return this.enabled;
   }
 
+  /** Sync current or first visible file editor to the doc pane. */
   async syncNow(editor?: vscode.TextEditor): Promise<void> {
-    await this.onActiveEditor(editor ?? vscode.window.activeTextEditor);
+    const target =
+      editor ??
+      vscode.window.activeTextEditor ??
+      vscode.window.visibleTextEditors.find((e) => e.document.uri.scheme === 'file');
+    await this.onActiveEditor(target);
+  }
+
+  private scheduleStartupSync(): void {
+    for (const ms of [0, 150, 500, 1500]) {
+      const handle = setTimeout(() => {
+        void this.syncNow();
+      }, ms);
+      this.disposables.push({ dispose: () => clearTimeout(handle) });
+    }
   }
 
   async revealDocForUri(sourceUri: vscode.Uri): Promise<boolean> {
@@ -71,8 +107,13 @@ export class SplitSync {
     if (!rel) {
       return false;
     }
+    const editor = vscode.window.visibleTextEditors.find(
+      (e) => e.document.uri.fsPath === sourceUri.fsPath
+    );
+    const line = (editor?.selection.active.line ?? 0) + 1;
     const index = await store.read();
-    const binding = store.findByTargetPath(index, rel);
+    const binding =
+      store.resolveBindingForLine(index, rel, line) ?? store.findByTargetPath(index, rel);
     if (!binding) {
       return false;
     }
@@ -85,7 +126,31 @@ export class SplitSync {
     await this.pane.show(docUri, column, forceFocus);
   }
 
+  async openHome(forceFocus = true): Promise<void> {
+    await this.pane.showHome(this.resolveColumn(), forceFocus);
+  }
+
+  /** Doc currently shown in the pane (workspace-relative), if any. */
+  currentDocRel(): string | undefined {
+    return this.pane.currentDocRel;
+  }
+
+  isHome(): boolean {
+    return this.pane.isHome;
+  }
+
+  releaseDoc(docRel: string): void {
+    this.pane.releaseDoc(docRel);
+  }
+
   private async onActiveEditor(editor: vscode.TextEditor | undefined): Promise<void> {
+    await this.syncForEditor(editor, false);
+  }
+
+  private async syncForEditor(
+    editor: vscode.TextEditor | undefined,
+    forceFocus: boolean
+  ): Promise<void> {
     if (!this.enabled || this.syncing || !editor) {
       return;
     }
@@ -109,21 +174,31 @@ export class SplitSync {
     }
 
     const index = await store.read();
-    const binding = store.findByTargetPath(index, rel);
-    if (!binding) {
-      if (shouldOfferBind(rel)) {
-        await this.showUnbound(rel, false);
-      }
+    const forFile = store.findBindingsForTarget(index, rel);
+    if (!forFile.length) {
+      // Always leave the previous doc; otherwise switching package.json → package-lock.json
+      // (and other skip-list files) keeps showing the old binding.
+      await this.showUnbound(rel, forceFocus, shouldOfferBind(rel));
       return;
     }
 
-    await this.openDoc(store, binding, false);
+    const line = editor.selection.active.line + 1;
+    const binding =
+      store.resolveBindingForLine(index, rel, line) ??
+      forFile.find((b) => b.target.kind === 'file') ??
+      forFile[0];
+
+    await this.openDoc(store, binding, forceFocus);
   }
 
-  private async showUnbound(sourceRel: string, forceFocus: boolean): Promise<void> {
+  private async showUnbound(
+    sourceRel: string,
+    forceFocus: boolean,
+    canCreate = true
+  ): Promise<void> {
     this.syncing = true;
     try {
-      await this.pane.showUnbound(sourceRel, this.resolveColumn(), forceFocus);
+      await this.pane.showUnbound(sourceRel, this.resolveColumn(), forceFocus, canCreate);
     } finally {
       this.syncing = false;
     }

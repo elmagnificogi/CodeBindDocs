@@ -4,11 +4,15 @@ import { Binding, normalizeRelPath } from '../store/types';
 
 export type DriftSeverity = 'info' | 'warning';
 
+export type DriftKind = 'missing-target' | 'missing-doc' | 'hash' | 'range';
+
 export interface DriftIssue {
   bindingId: string;
   message: string;
   severity: DriftSeverity;
+  kind: DriftKind;
   targetPath: string;
+  doc: string;
 }
 
 /**
@@ -72,6 +76,8 @@ export class DriftChecker {
         found.push({
           bindingId: binding.id,
           targetPath: binding.target.path,
+          doc: binding.doc,
+          kind: 'missing-target',
           severity: 'warning',
           message: `绑定源文件缺失: ${binding.target.path}`,
         });
@@ -84,6 +90,8 @@ export class DriftChecker {
         found.push({
           bindingId: binding.id,
           targetPath: binding.target.path,
+          doc: binding.doc,
+          kind: 'missing-doc',
           severity: 'warning',
           message: `绑定文档缺失: ${binding.doc}`,
         });
@@ -115,6 +123,8 @@ export class DriftChecker {
         out.push({
           bindingId: binding.id,
           targetPath: binding.target.path,
+          doc: binding.doc,
+          kind: 'hash',
           severity: 'info',
           message: `源文件内容已变（相对 contentHash，${anchor.symbol ?? 'file'}）`,
         });
@@ -134,6 +144,8 @@ export class DriftChecker {
         out.push({
           bindingId: binding.id,
           targetPath: binding.target.path,
+          doc: binding.doc,
+          kind: 'range',
           severity: 'warning',
           message: `行范围 ${binding.target.startLine}-${binding.target.endLine} 越界（共 ${doc.lineCount} 行）`,
         });

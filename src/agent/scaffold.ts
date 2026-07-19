@@ -13,12 +13,12 @@ const AGENTS_CONTENT = `# AGENTS
 
 ## 绑定格式
 
+文件头用三连短横线围栏包裹；正文示例勿写裸分隔线。
+
 \`\`\`yaml
----
 cim:
   target: src/foo.ts
   kind: file
----
 \`\`\`
 
 ## Agent 规则
@@ -35,6 +35,8 @@ cim:
 - \`CIM: Initialize\` — 创建文档目录与脚手架
 - \`CIM: Open Docs Index\` — 打开文档汇总页
 - \`CIM: Bind Doc to Current File\` — 为当前文件写入带文件头的文档
+- \`CIM: Rebind Doc to Source\` — 失效文档改绑源文件
+- \`CIM: Delete Bound Doc\` — 删除绑定文档
 - \`CIM: Reveal Bound Doc\` — 打开绑定文档
 `;
 
@@ -52,6 +54,7 @@ alwaysApply: false
 - 文档目录：\`cim.docsPath\`（默认 \`docs/\`）
 - 汇总：\`docs/cim-index.md\`（自动生成）
 - 绑定：每个 Markdown 文件头的 YAML \`cim.target\`
+- 模块对照见根目录 \`AGENTS.md\`
 
 编辑某文件前，可先看 \`cim-index.md\`；若存在 \`cim.target\` 指向该文件的文档：
 
