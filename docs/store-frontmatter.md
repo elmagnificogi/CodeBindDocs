@@ -2,7 +2,7 @@
 cim:
   target: src/store/frontmatter.ts
   kind: file
-  contentHash: f685cc8c19b1
+  contentHash: 6533b51a8909
 ---
 # frontmatter.ts
 

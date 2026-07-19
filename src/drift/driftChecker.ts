@@ -4,7 +4,13 @@ import { Binding, normalizeRelPath } from '../store/types';
 
 export type DriftSeverity = 'info' | 'warning';
 
-export type DriftKind = 'missing-target' | 'missing-doc' | 'hash' | 'range';
+export type DriftKind =
+  | 'missing-target'
+  | 'missing-doc'
+  | 'hash'
+  | 'range'
+  | 'symbol'
+  | 'renamed';
 
 export interface DriftIssue {
   bindingId: string;
@@ -16,19 +22,23 @@ export interface DriftIssue {
 }
 
 /**
- * Watches renames and content hashes; updates Markdown frontmatter when possible.
+ * Watches renames and content/range/symbol drift; prompts when bindings may need update.
  */
 export class DriftChecker {
   private readonly diagnosticCollection: vscode.DiagnosticCollection;
   private readonly statusBar: vscode.StatusBarItem;
   private readonly disposables: vscode.Disposable[] = [];
   private issues: DriftIssue[] = [];
+  /** Avoid repeating the same toast until the issue clears or changes. */
+  private notifiedKeys = new Set<string>();
+  /** Skip onSave side-effects during programmatic batch writes (bind / rebind). */
+  private suspendSaveHandling = 0;
 
   constructor(private readonly getStore: () => IndexStore | undefined) {
     this.diagnosticCollection = vscode.languages.createDiagnosticCollection('cim');
     this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
-    this.statusBar.command = 'cim.refreshTree';
-    this.statusBar.tooltip = 'CIM binding drift';
+    this.statusBar.command = 'cim.showDriftIssues';
+    this.statusBar.tooltip = 'CIM 绑定漂移 — 点击查看';
     this.statusBar.show();
 
     this.disposables.push(
@@ -39,7 +49,7 @@ export class DriftChecker {
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration('cim.docsPath') || e.affectsConfiguration('cim.assetsPath')) {
           this.getStore()?.invalidateCache();
-          void this.scanAll();
+          void this.scanAll({ notify: false });
         }
       })
     );
@@ -55,10 +65,24 @@ export class DriftChecker {
     return this.issues;
   }
 
-  async scanAll(): Promise<DriftIssue[]> {
+  /** Run work without reacting to Markdown saves (avoids nested scanAll / index rewrite). */
+  async runWithoutSaveHandling<T>(fn: () => Promise<T>): Promise<T> {
+    this.suspendSaveHandling++;
+    try {
+      return await fn();
+    } finally {
+      this.suspendSaveHandling--;
+    }
+  }
+
+  async scanAll(options?: {
+    notify?: boolean;
+    focusTarget?: string;
+  }): Promise<DriftIssue[]> {
     const store = this.getStore();
     if (!store || !(await store.exists())) {
       this.issues = [];
+      this.notifiedKeys.clear();
       this.applyDiagnostics(store, []);
       this.updateStatus();
       return [];
@@ -102,10 +126,106 @@ export class DriftChecker {
       found.push(...hashIssues);
     }
 
+    const previousKeys = new Set(this.notifiedKeys);
     this.issues = found;
+    // Drop notified keys that no longer apply
+    const currentKeys = new Set(found.map(issueKey));
+    for (const key of [...this.notifiedKeys]) {
+      if (!currentKeys.has(key)) {
+        this.notifiedKeys.delete(key);
+      }
+    }
+
     this.applyDiagnostics(store, found);
     this.updateStatus();
+
+    if (options?.notify === true) {
+      await this.notifyNewIssues(found, previousKeys, options?.focusTarget);
+    }
     return found;
+  }
+
+  /** Interactive list of current drift issues (status bar / command). */
+  async showIssuesPicker(): Promise<void> {
+    await this.scanAll({ notify: false });
+    if (!this.issues.length) {
+      void vscode.window.showInformationMessage('CIM: 当前没有绑定漂移。');
+      return;
+    }
+
+    const hashCount = this.issues.filter((i) => i.kind === 'hash').length;
+    type PickItem = {
+      label: string;
+      description?: string;
+      detail?: string;
+      issue?: DriftIssue;
+      bulkHash?: boolean;
+    };
+    const items: PickItem[] = [];
+    if (hashCount > 0) {
+      items.push({
+        label: '$(check) 全部标记已核对',
+        description: `${hashCount} 项 · 可选`,
+        detail: '核对过文档后可更新 contentHash，清除提醒；不强制',
+        bulkHash: true,
+      });
+    }
+    for (const issue of this.issues) {
+      items.push({
+        label: driftKindLabel(issue.kind),
+        description: issue.targetPath,
+        detail: `${issue.message} → ${issue.doc}`,
+        issue,
+      });
+    }
+
+    const picked = await vscode.window.showQuickPick(items, {
+      title: 'CIM 绑定变更提示',
+      placeHolder: '选择一项进行处理',
+    });
+    if (!picked) {
+      return;
+    }
+    if (picked.bulkHash) {
+      await this.refreshAllHashes();
+      return;
+    }
+    if (picked.issue) {
+      await this.promptIssueActions(picked.issue, true);
+    }
+  }
+
+  /** Refresh contentHash for every binding that currently has hash drift. */
+  async refreshAllHashes(): Promise<number> {
+    const store = this.getStore();
+    if (!store) {
+      return 0;
+    }
+    await this.scanAll({ notify: false });
+    const hashIssues = this.issues.filter((i) => i.kind === 'hash');
+    if (!hashIssues.length) {
+      void vscode.window.showInformationMessage('CIM: 当前没有待核对的源码变更提醒。');
+      return 0;
+    }
+    const index = await store.read();
+    let n = 0;
+    for (const issue of hashIssues) {
+      const binding = index.bindings.find((b) => b.doc === issue.doc);
+      if (!binding) {
+        continue;
+      }
+      try {
+        await refreshBindingHash(store, binding);
+        this.notifiedKeys.delete(issueKey(issue));
+        n++;
+      } catch {
+        // skip missing targets etc.
+      }
+    }
+    await store.writeDocsIndex();
+    await this.scanAll({ notify: false });
+    void vscode.window.showInformationMessage(`CIM: 已标记 ${n} 个文档为已核对`);
+    return n;
   }
 
   private async checkAnchors(
@@ -113,44 +233,74 @@ export class DriftChecker {
     binding: Binding,
     targetUri: vscode.Uri
   ): Promise<DriftIssue[]> {
-    if (!binding.anchors?.length) {
-      return [];
-    }
-    const currentHash = await store.hashFileContent(targetUri);
     const out: DriftIssue[] = [];
-    for (const anchor of binding.anchors) {
-      if (anchor.contentHash && anchor.contentHash !== currentHash) {
-        out.push({
-          bindingId: binding.id,
-          targetPath: binding.target.path,
-          doc: binding.doc,
-          kind: 'hash',
-          severity: 'info',
-          message: `源文件内容已变（相对 contentHash，${anchor.symbol ?? 'file'}）`,
-        });
-      }
+    const textDoc = await vscode.workspace.openTextDocument(targetUri);
+    const currentHash = await store.hashFileContent(targetUri);
+    const anchor = binding.anchors?.[0];
+    const symbol = anchor?.symbol;
+
+    if (anchor?.contentHash && anchor.contentHash !== currentHash) {
+      out.push({
+        bindingId: binding.id,
+        targetPath: binding.target.path,
+        doc: binding.doc,
+        kind: 'hash',
+        severity: 'info',
+        message: `源码已修改，请确认旁路文档是否仍准确（${symbol ?? '整文件'}）· 仅提醒，可忽略`,
+      });
     }
+
     if (
       binding.target.kind === 'range' &&
       typeof binding.target.startLine === 'number' &&
       typeof binding.target.endLine === 'number'
     ) {
-      const doc = await vscode.workspace.openTextDocument(targetUri);
-      if (
-        binding.target.startLine < 1 ||
-        binding.target.endLine > doc.lineCount ||
-        binding.target.startLine > binding.target.endLine
-      ) {
+      const { startLine, endLine } = binding.target;
+      if (startLine < 1 || endLine > textDoc.lineCount || startLine > endLine) {
         out.push({
           bindingId: binding.id,
           targetPath: binding.target.path,
           doc: binding.doc,
           kind: 'range',
           severity: 'warning',
-          message: `行范围 ${binding.target.startLine}-${binding.target.endLine} 越界（共 ${doc.lineCount} 行）`,
+          message: `行范围 L${startLine}-${endLine} 越界（文件共 ${textDoc.lineCount} 行）`,
+        });
+      } else if (symbol) {
+        const foundLine = findSymbolLine(textDoc.getText(), symbol);
+        if (foundLine == null) {
+          out.push({
+            bindingId: binding.id,
+            targetPath: binding.target.path,
+            doc: binding.doc,
+            kind: 'symbol',
+            severity: 'warning',
+            message: `未找到符号「${symbol}」，代码块绑定可能已失效`,
+          });
+        } else if (foundLine < startLine || foundLine > endLine) {
+          out.push({
+            bindingId: binding.id,
+            targetPath: binding.target.path,
+            doc: binding.doc,
+            kind: 'symbol',
+            severity: 'warning',
+            message: `符号「${symbol}」现位于 L${foundLine}，不在绑定范围 L${startLine}-${endLine}`,
+          });
+        }
+      }
+    } else if (symbol && binding.target.kind === 'file') {
+      const foundLine = findSymbolLine(textDoc.getText(), symbol);
+      if (foundLine == null && anchor?.contentHash && anchor.contentHash !== currentHash) {
+        out.push({
+          bindingId: binding.id,
+          targetPath: binding.target.path,
+          doc: binding.doc,
+          kind: 'symbol',
+          severity: 'info',
+          message: `未找到符号「${symbol}」（文件内容亦已变化）`,
         });
       }
     }
+
     return out;
   }
 
@@ -160,25 +310,58 @@ export class DriftChecker {
       return;
     }
 
-    let changed = false;
+    const updated: string[] = [];
+    const unresolved: { oldRel: string; newRel: string }[] = [];
+
     for (const file of e.files) {
       const oldRel = store.toWorkspaceRelative(file.oldUri);
       const newRel = store.toWorkspaceRelative(file.newUri);
       if (!oldRel || !newRel) {
         continue;
       }
+      if (store.isUnderDocsPath(oldRel) || store.isUnderDocsPath(newRel)) {
+        // Doc renames are picked up by rescan (binding id = path).
+        continue;
+      }
       if (await store.updateTargetPath(oldRel, newRel)) {
-        changed = true;
+        updated.push(`${oldRel} → ${newRel}`);
+      } else {
+        // Might still have bindings that need manual rebind if path logic missed
+        unresolved.push({ oldRel, newRel });
       }
     }
 
-    if (changed) {
-      void vscode.window.showInformationMessage('CIM: 已根据改名更新文档头中的 target。');
+    if (updated.length) {
+      const choice = await vscode.window.showInformationMessage(
+        `CIM: 已根据改名更新绑定路径：\n${updated.slice(0, 3).join('\n')}${
+          updated.length > 3 ? `\n…共 ${updated.length} 处` : ''
+        }`,
+        '打开文档主页',
+        '查看漂移'
+      );
+      if (choice === '打开文档主页') {
+        await vscode.commands.executeCommand('cim.openDocsIndex');
+      } else if (choice === '查看漂移') {
+        await this.showIssuesPicker();
+      }
     }
-    await this.scanAll();
+
+    await store.writeDocsIndex();
+    const issues = await this.scanAll({ notify: true });
+
+    if (!updated.length && unresolved.length) {
+      void vscode.window.showWarningMessage(
+        `CIM: 检测到文件改名，但未找到可自动更新的绑定。可在主页或「查看漂移」中处理。`
+      );
+    } else if (issues.some((i) => i.kind === 'missing-target' || i.kind === 'missing-doc')) {
+      // scanAll notify already handles; ensure rename-related missing is visible
+    }
   }
 
   private async onSave(doc: vscode.TextDocument): Promise<void> {
+    if (this.suspendSaveHandling > 0) {
+      return;
+    }
     const store = this.getStore();
     if (!store) {
       return;
@@ -192,13 +375,153 @@ export class DriftChecker {
         return;
       }
       store.invalidateCache();
-      await this.scanAll();
-      await store.writeDocsIndex();
+      // Debounce: index rewrite is owned by the writer (writeBinding / bind flow).
+      await this.scanAll({ notify: false });
       return;
     }
     const index = await store.read();
-    if (store.findByTargetPath(index, rel)) {
-      await this.scanAll();
+    if (store.findBindingsForTarget(index, rel).length) {
+      await this.scanAll({ notify: true, focusTarget: rel });
+    }
+  }
+
+  private async notifyNewIssues(
+    found: DriftIssue[],
+    previousNotified: Set<string>,
+    focusTarget?: string
+  ): Promise<void> {
+    const actionable = found.filter(
+      (i) =>
+        i.kind === 'hash' ||
+        i.kind === 'range' ||
+        i.kind === 'symbol' ||
+        i.kind === 'missing-target' ||
+        i.kind === 'missing-doc'
+    );
+    // Save-focused: only toast for the saved target. Global scan: warnings only (not mere hash info).
+    const candidates = focusTarget
+      ? actionable.filter((i) => normalizeRelPath(i.targetPath) === normalizeRelPath(focusTarget))
+      : actionable.filter((i) => i.severity === 'warning');
+
+    for (const issue of candidates) {
+      const key = issueKey(issue);
+      if (this.notifiedKeys.has(key) && previousNotified.has(key)) {
+        continue;
+      }
+      this.notifiedKeys.add(key);
+      await this.promptIssueActions(issue, false);
+      // One toast per save/scan burst to avoid spam
+      break;
+    }
+  }
+
+  private async promptIssueActions(issue: DriftIssue, force: boolean): Promise<void> {
+    // Hash drift is a soft reminder only — never pressure rebind / mandatory hash update.
+    if (issue.kind === 'hash') {
+      // Soft reminder: save toast only offers dismiss / open; mark-checked is optional in picker.
+      const actions = force
+        ? ['打开文档核对', '标记已核对', '知道了']
+        : ['知道了', '打开文档核对'];
+      const otherHash = this.issues.filter((i) => i.kind === 'hash' && i.doc !== issue.doc).length;
+      if (otherHash > 0 && force) {
+        actions.splice(2, 0, '全部标记已核对');
+      }
+      const pick = await vscode.window.showInformationMessage(
+        `CIM 提醒（可忽略）\n${issue.message}\n文档：${issue.doc}`,
+        ...actions
+      );
+      if (!pick || pick === '知道了') {
+        return;
+      }
+      if (pick === '全部标记已核对') {
+        await this.refreshAllHashes();
+        return;
+      }
+      if (pick === '标记已核对') {
+        const store = this.getStore();
+        if (!store) {
+          return;
+        }
+        const index = await store.read();
+        const binding = index.bindings.find((b) => b.doc === issue.doc);
+        if (binding) {
+          await refreshBindingHash(store, binding);
+          this.notifiedKeys.delete(issueKey(issue));
+          await this.scanAll({ notify: false });
+          void vscode.window.showInformationMessage(`CIM: 已清除 ${issue.doc} 的源码变更提醒`);
+        }
+        return;
+      }
+      if (pick === '打开文档核对') {
+        await vscode.commands.executeCommand('cim.openDoc', {
+          binding: {
+            doc: issue.doc,
+            id: issue.doc,
+            target: { path: issue.targetPath, kind: 'file' },
+          },
+        });
+      }
+      return;
+    }
+
+    const actions: string[] = [];
+    if (issue.kind === 'missing-doc') {
+      actions.push('重新绑定');
+    } else if (issue.kind === 'missing-target') {
+      actions.push('重新绑定', '删除文档');
+    } else if (issue.kind === 'range' || issue.kind === 'symbol') {
+      actions.push('重新绑定');
+    }
+    if (issue.kind === 'missing-doc') {
+      actions.push('打开源文件');
+    } else if (issue.kind !== 'missing-target') {
+      actions.push('打开文档');
+    }
+    actions.push('忽略');
+
+    const title =
+      issue.kind === 'range' || issue.kind === 'symbol'
+        ? `CIM 绑定关系可能已变更`
+        : `CIM 绑定异常`;
+
+    const pick = await vscode.window.showWarningMessage(
+      `${title}\n${issue.message}\n文档：${issue.doc}`,
+      ...(force ? actions : actions.filter((a) => a !== '忽略').concat('忽略'))
+    );
+
+    if (!pick || pick === '忽略') {
+      return;
+    }
+    if (pick === '重新绑定') {
+      if (issue.kind === 'missing-doc') {
+        await vscode.commands.executeCommand('cim.bindCurrentFile', issue.targetPath);
+      } else {
+        await vscode.commands.executeCommand('cim.rebindDoc', { docRel: issue.doc });
+      }
+      return;
+    }
+    if (pick === '打开文档') {
+      await vscode.commands.executeCommand('cim.openDoc', {
+        binding: { doc: issue.doc, id: issue.doc, target: { path: issue.targetPath, kind: 'file' } },
+      });
+      return;
+    }
+    if (pick === '打开源文件') {
+      const store = this.getStore();
+      if (!store) {
+        return;
+      }
+      const uri = store.targetUri(issue.targetPath);
+      try {
+        const textDoc = await vscode.workspace.openTextDocument(uri);
+        await vscode.window.showTextDocument(textDoc, { viewColumn: vscode.ViewColumn.One });
+      } catch {
+        void vscode.window.showWarningMessage(`CIM: 无法打开 ${issue.targetPath}`);
+      }
+      return;
+    }
+    if (pick === '删除文档') {
+      await vscode.commands.executeCommand('cim.deleteDoc', { docRel: issue.doc });
     }
   }
 
@@ -235,14 +558,62 @@ export class DriftChecker {
     if (warnings === 0 && infos === 0) {
       this.statusBar.text = '$(book) CIM';
       this.statusBar.backgroundColor = undefined;
+      this.statusBar.tooltip = 'CIM 绑定漂移 — 点击查看';
     } else if (warnings > 0) {
-      this.statusBar.text = `$(warning) CIM ${warnings}`;
+      this.statusBar.text = `$(warning) CIM 绑定 ${warnings}`;
       this.statusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+      this.statusBar.tooltip = 'CIM 绑定异常 — 点击处理';
     } else {
-      this.statusBar.text = `$(info) CIM ${infos}`;
+      this.statusBar.text = `$(info) CIM 核对 ${infos}`;
       this.statusBar.backgroundColor = undefined;
+      this.statusBar.tooltip = '源码变更提醒（可忽略）— 点击查看';
     }
   }
+}
+
+function issueKey(issue: DriftIssue): string {
+  return `${issue.kind}|${issue.doc}|${issue.targetPath}|${issue.message}`;
+}
+
+function driftKindLabel(kind: DriftKind): string {
+  switch (kind) {
+    case 'missing-target':
+      return '源文件缺失';
+    case 'missing-doc':
+      return '文档缺失';
+    case 'hash':
+      return '文档核对提醒';
+    case 'range':
+      return '行范围失效';
+    case 'symbol':
+      return '符号变动';
+    case 'renamed':
+      return '路径已改';
+    default:
+      return kind;
+  }
+}
+
+/** Best-effort symbol line lookup for common JS/TS declarations. */
+export function findSymbolLine(text: string, symbol: string): number | undefined {
+  const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`(?:export\\s+)?(?:default\\s+)?(?:async\\s+)?function\\s+${escaped}\\b`),
+    new RegExp(`(?:export\\s+)?(?:abstract\\s+)?class\\s+${escaped}\\b`),
+    new RegExp(`(?:export\\s+)?(?:async\\s+)?function\\*?\\s+${escaped}\\b`),
+    new RegExp(`(?:export\\s+)?(?:const|let|var)\\s+${escaped}\\b`),
+    new RegExp(`(?:export\\s+)?(?:type|interface|enum)\\s+${escaped}\\b`),
+    new RegExp(`${escaped}\\s*=\\s*(?:async\\s*)?(?:function|\\()`),
+  ];
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    for (const re of patterns) {
+      if (re.test(lines[i])) {
+        return i + 1;
+      }
+    }
+  }
+  return undefined;
 }
 
 /** Refresh file-level contentHash in Markdown frontmatter after bind. */

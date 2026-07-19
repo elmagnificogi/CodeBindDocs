@@ -147,9 +147,14 @@ export class IndexStore {
     return index;
   }
 
-  async writeBinding(binding: Binding): Promise<void> {
+  async writeBinding(
+    binding: Binding,
+    options?: { refreshIndex?: boolean; title?: string }
+  ): Promise<void> {
     const uri = this.docUri(binding.doc);
-    let body = defaultDocBody(binding.target.path.split('/').pop() ?? binding.target.path);
+    const fallbackTitle =
+      options?.title ?? binding.target.path.split('/').pop() ?? binding.target.path;
+    let body = defaultDocBody(fallbackTitle);
     try {
       const raw = await vscode.workspace.fs.readFile(uri);
       const text = Buffer.from(raw).toString('utf8');
@@ -162,7 +167,9 @@ export class IndexStore {
     const content = serializeCimFrontmatter(bindingToFrontmatter(binding), body);
     await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
     this.invalidateCache();
-    await this.writeDocsIndex();
+    if (options?.refreshIndex !== false) {
+      await this.writeDocsIndex();
+    }
   }
 
   /**

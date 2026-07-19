@@ -56,4 +56,6 @@ cim:
 - `CIM: Bind Doc to Current File` — 新建绑定
 - `CIM: Rebind Doc to Source` — 失效文档改绑源文件
 - `CIM: Delete Bound Doc` — 删除绑定文档（需确认）
+- `CIM: Show Binding Drift` — 查看绑定漂移并处理
+- `CIM: Refresh Doc contentHash` — 刷新文档内容哈希
 - `CIM: Reveal Bound Doc` — 打开当前文件的绑定文档

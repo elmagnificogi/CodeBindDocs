@@ -3,7 +3,7 @@ cim:
   target: src/extension.ts
   kind: file
   symbol: activate
-  contentHash: fe412d9ccbfe
+  contentHash: 4f6854c9f462
 ---
 # extension.ts
 
@@ -29,6 +29,9 @@ cim:
 | `cim.rebindDoc` | 将文档改绑：选源文件 → 整文件或代码块（状态栏确认选区） |
 | `cim.toggleSplitSync` | 开关分栏同步 |
 | `cim.refreshTree` | 刷新树与漂移扫描 |
+| `cim.showDriftIssues` | 查看并处理绑定漂移 |
+| `cim.refreshDocHash` | 刷新文档 contentHash |
+| `cim.refreshAllDocHashes` | 全部标记已核对（清除哈希提醒，可选） |
 
 ## 约束
 

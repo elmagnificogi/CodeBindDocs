@@ -10,8 +10,8 @@
 | --- | --- | --- |
 | [`src/agent/scaffold.ts`](../src/agent/scaffold.ts) | [`docs/agent-scaffold.md`](./agent-scaffold.md) | file |
 | [`src/drift/driftChecker.ts`](../src/drift/driftChecker.ts) | [`docs/drift-checker.md`](./drift-checker.md) | file |
-| [`src/extension.ts`](../src/extension.ts) | [`docs/extension.md`](./extension.md) | file |
 | [`src/extension.ts`](../src/extension.ts) | [`docs/extension-activate.md`](./extension-activate.md) | range L15-58 (activate) |
+| [`src/extension.ts`](../src/extension.ts) | [`docs/extension.md`](./extension.md) | file |
 | [`src/store/frontmatter.ts`](../src/store/frontmatter.ts) | [`docs/store-frontmatter.md`](./store-frontmatter.md) | file |
 | [`src/store/indexStore.ts`](../src/store/indexStore.ts) | [`docs/data-model.md`](./data-model.md) | file |
 | [`src/store/types.ts`](../src/store/types.ts) | [`docs/store-types.md`](./store-types.md) | file |

@@ -122,8 +122,7 @@ export class SplitSync {
   }
 
   async openDocUri(docUri: vscode.Uri, forceFocus = true): Promise<void> {
-    const column = this.resolveColumn();
-    await this.pane.show(docUri, column, forceFocus);
+    await this.pane.show(docUri, this.resolveColumn(), forceFocus);
   }
 
   async openHome(forceFocus = true): Promise<void> {
@@ -205,6 +204,11 @@ export class SplitSync {
   }
 
   private resolveColumn(): vscode.ViewColumn {
+    // Keep the CIM pane in its current group — Beside/Two on reveal resizes splits.
+    const existing = this.pane.viewColumn;
+    if (existing != null) {
+      return existing;
+    }
     const mode = vscode.workspace
       .getConfiguration('cim')
       .get<string>('splitSync.viewColumn', 'Beside');

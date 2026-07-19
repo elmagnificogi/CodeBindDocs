@@ -3,7 +3,7 @@ cim:
   target: src/agent/scaffold.ts
   kind: file
   symbol: scaffoldAgentFiles
-  contentHash: 4b54ab178a9a
+  contentHash: 62d4b94b42c4
 ---
 # scaffold.ts
 

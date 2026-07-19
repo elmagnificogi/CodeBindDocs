@@ -3,7 +3,7 @@ cim:
   target: src/sync/splitSync.ts
   kind: file
   symbol: SplitSync
-  contentHash: 15b97781b56f
+  contentHash: 2b7089769493
 ---
 # splitSync.ts
 
@@ -28,3 +28,4 @@ cim:
 
 - 自动同步不抢源码焦点
 - 删除文档前 `releaseDoc` 取消待保存，避免写回已删文件
+- 面板已打开时始终留在当前编辑器组；勿用 `Beside` 再次 reveal（会改分栏尺寸）

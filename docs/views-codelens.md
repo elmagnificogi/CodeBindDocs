@@ -3,7 +3,7 @@ cim:
   target: src/views/cimCodeLens.ts
   kind: file
   symbol: CimCodeLensProvider
-  contentHash: 45a6b5f6b370
+  contentHash: 1f0f253cecea
 ---
 # cimCodeLens.ts
 

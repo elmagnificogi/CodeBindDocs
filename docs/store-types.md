@@ -2,7 +2,7 @@
 cim:
   target: src/store/types.ts
   kind: file
-  contentHash: e4eedb039b1c
+  contentHash: 23538fc0bf0d
 ---
 # types.ts
 

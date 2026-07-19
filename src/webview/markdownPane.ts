@@ -11,10 +11,14 @@ type DocListItem = {
   doc: string;
   target: string;
   title: string;
+  kind?: 'file' | 'range' | 'index';
+  startLine?: number;
+  endLine?: number;
+  symbol?: string;
 };
 
 type MissingItem = {
-  kind: 'missing-target' | 'missing-doc';
+  kind: 'missing-target' | 'missing-doc' | 'hash' | 'range' | 'symbol';
   target: string;
   doc: string;
   message: string;
@@ -43,6 +47,8 @@ type HostToWeb =
       docsPath: string;
       docs: DocListItem[];
       missing: MissingItem[];
+      /** Soft reminders: source changed, check if docs need sync (not mandatory). */
+      hints: MissingItem[];
       canBack: boolean;
       canForward: boolean;
     };
@@ -58,7 +64,9 @@ type WebToHost =
   | { type: 'openDoc'; docRel: string }
   | { type: 'deleteDoc'; docRel: string }
   | { type: 'openTarget'; sourceRel: string }
-  | { type: 'rebindDoc'; docRel: string };
+  | { type: 'rebindDoc'; docRel: string }
+  | { type: 'refreshHash'; docRel: string }
+  | { type: 'refreshAllHashes' };
 
 type NavEntry =
   | { kind: 'home' }
@@ -161,9 +169,23 @@ export class MarkdownPane {
     }
   }
 
+  /** Current editor group of the CIM pane, if already open. */
+  get viewColumn(): vscode.ViewColumn | undefined {
+    return this.panel?.viewColumn;
+  }
+
+  /**
+   * Prefer the pane's existing column so reveal() does not create/resize splits.
+   * Only use the requested column when creating the panel for the first time.
+   */
+  private stayColumn(requested: vscode.ViewColumn): vscode.ViewColumn {
+    return this.panel?.viewColumn ?? requested;
+  }
+
   async show(docUri: vscode.Uri, column: vscode.ViewColumn, forceFocus: boolean): Promise<void> {
     const store = this.getStore();
     const docRel = store?.toWorkspaceRelative(docUri);
+    const col = this.stayColumn(column);
 
     if (
       this.panel &&
@@ -172,7 +194,7 @@ export class MarkdownPane {
       !this.unboundSourceRel
     ) {
       if (forceFocus) {
-        this.panel.reveal(column, false);
+        this.panel.reveal(col, false);
       }
       return;
     }
@@ -180,7 +202,7 @@ export class MarkdownPane {
     this.unboundSourceRel = undefined;
     this.viewingHome = false;
     this.currentUri = docUri;
-    await this.ensurePanel(column, !forceFocus);
+    await this.ensurePanel(col, !forceFocus);
 
     if (docRel && !this.navigatingHistory) {
       this.pushHistory({ kind: 'doc', docRel: normalizeRelPath(docRel) });
@@ -188,7 +210,7 @@ export class MarkdownPane {
 
     await this.reloadFromDisk();
     if (forceFocus) {
-      this.panel?.reveal(column, false);
+      this.panel?.reveal(this.stayColumn(col), false);
     }
   }
 
@@ -198,6 +220,7 @@ export class MarkdownPane {
     forceFocus: boolean,
     canCreate = true
   ): Promise<void> {
+    const col = this.stayColumn(column);
     if (
       this.unboundSourceRel === sourceRel &&
       this.panel &&
@@ -205,7 +228,7 @@ export class MarkdownPane {
       !this.viewingHome
     ) {
       if (forceFocus) {
-        this.panel.reveal(column, false);
+        this.panel.reveal(col, false);
       }
       return;
     }
@@ -215,7 +238,7 @@ export class MarkdownPane {
     this.viewingHome = false;
     this.unboundSourceRel = sourceRel;
     this.unboundCanCreate = canCreate;
-    await this.ensurePanel(column, !forceFocus);
+    await this.ensurePanel(col, !forceFocus);
 
     if (!this.navigatingHistory) {
       this.pushHistory({ kind: 'unbound', sourceRel });
@@ -229,7 +252,7 @@ export class MarkdownPane {
       ...this.navFlags(),
     } satisfies HostToWeb);
     if (forceFocus) {
-      this.panel?.reveal(column, false);
+      this.panel?.reveal(this.stayColumn(col), false);
     }
   }
 
@@ -239,7 +262,8 @@ export class MarkdownPane {
     this.header = undefined;
     this.unboundSourceRel = undefined;
     this.viewingHome = true;
-    await this.ensurePanel(column, !forceFocus);
+    const col = this.stayColumn(column);
+    await this.ensurePanel(col, !forceFocus);
 
     if (!this.navigatingHistory) {
       this.pushHistory({ kind: 'home' });
@@ -248,7 +272,7 @@ export class MarkdownPane {
     await this.refreshDrift();
     await this.postHome();
     if (forceFocus) {
-      this.panel?.reveal(column, false);
+      this.panel?.reveal(this.stayColumn(col), false);
     }
   }
 
@@ -310,6 +334,7 @@ export class MarkdownPane {
     const store = this.getStore();
     const docs: DocListItem[] = [];
     const missing: MissingItem[] = [];
+    const hints: MissingItem[] = [];
     let docsPath = 'docs';
     if (store) {
       docsPath = store.docsPath;
@@ -320,18 +345,37 @@ export class MarkdownPane {
             doc: b.doc,
             target: b.target.path,
             title: b.doc.split('/').pop() ?? b.doc,
+            kind: b.target.kind === 'range' ? 'range' : 'file',
+            startLine: b.target.startLine,
+            endLine: b.target.endLine,
+            symbol: b.anchors?.[0]?.symbol,
           });
         }
         docs.unshift({
           doc: store.indexDocPath,
           target: '(汇总)',
           title: 'cim-index.md',
+          kind: 'index',
         });
       }
     }
 
     for (const issue of this.getDriftIssues()) {
-      if (issue.kind !== 'missing-target' && issue.kind !== 'missing-doc') {
+      if (issue.kind === 'hash') {
+        hints.push({
+          kind: issue.kind,
+          target: issue.targetPath,
+          doc: issue.doc,
+          message: issue.message,
+        });
+        continue;
+      }
+      if (
+        issue.kind !== 'missing-target' &&
+        issue.kind !== 'missing-doc' &&
+        issue.kind !== 'range' &&
+        issue.kind !== 'symbol'
+      ) {
         continue;
       }
       missing.push({
@@ -348,13 +392,16 @@ export class MarkdownPane {
       docsPath,
       docs,
       missing,
+      hints,
       ...this.navFlags(),
     } satisfies HostToWeb);
   }
 
   private async ensurePanel(column: vscode.ViewColumn, preserveFocus: boolean): Promise<void> {
     if (this.panel) {
-      this.panel.reveal(column, preserveFocus);
+      // Never move an existing panel into Beside/Two — that resizes editor groups.
+      const col = this.panel.viewColumn ?? column;
+      this.panel.reveal(col, preserveFocus);
       return;
     }
 
@@ -434,6 +481,16 @@ export class MarkdownPane {
         await vscode.commands.executeCommand('cim.rebindDoc', {
           docRel: msg.docRel,
         });
+        return;
+      }
+      if (msg.type === 'refreshHash') {
+        await vscode.commands.executeCommand('cim.refreshDocHash', {
+          docRel: msg.docRel,
+        });
+        return;
+      }
+      if (msg.type === 'refreshAllHashes') {
+        await vscode.commands.executeCommand('cim.refreshAllDocHashes');
         return;
       }
       if (msg.type === 'openTarget') {
@@ -674,6 +731,38 @@ export class MarkdownPane {
     }
     .doc-list a:hover { background: rgba(127,127,127,0.16); }
     .doc-list .meta { display: block; margin-top: 4px; opacity: 0.65; font-size: 12px; color: var(--vscode-editor-foreground); }
+    .bound-tree { list-style: none; padding: 0; margin: 0; }
+    .bound-tree ul { list-style: none; padding: 0 0 0 14px; margin: 2px 0 6px;
+      border-left: 1px solid var(--vscode-panel-border, rgba(127,127,127,0.35)); }
+    .bound-tree .folder-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 2px; font-size: 12px; font-weight: 600;
+      font-family: var(--vscode-editor-font-family);
+      opacity: 0.8; user-select: none;
+    }
+    .bound-tree .folder-row .twist {
+      display: inline-block; width: 12px; opacity: 0.55; font-size: 10px;
+    }
+    .bound-tree .file-row {
+      margin: 0 0 6px;
+    }
+    .bound-tree .file-label {
+      padding: 2px 2px 4px; font-size: 12px;
+      font-family: var(--vscode-editor-font-family); opacity: 0.7;
+    }
+    .bound-tree .leaf a {
+      display: block; padding: 8px 10px; border-radius: 6px; text-decoration: none;
+      color: var(--vscode-textLink-foreground);
+      background: rgba(127,127,127,0.08);
+      border: 1px solid var(--vscode-panel-border, transparent);
+      margin: 0 0 4px;
+    }
+    .bound-tree .leaf a:hover { background: rgba(127,127,127,0.16); }
+    .bound-tree .leaf .meta {
+      display: block; margin-top: 3px; opacity: 0.65; font-size: 12px;
+      color: var(--vscode-editor-foreground);
+    }
+    .bound-tree .index-item { margin-bottom: 12px; }
     .doc-list .actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
     .doc-list .actions button {
       border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px;
@@ -695,9 +784,21 @@ export class MarkdownPane {
       background: rgba(241, 76, 76, 0.18);
       color: var(--vscode-errorForeground, #f14c4c);
     }
-    #missingSection { margin-bottom: 28px; }
-    #missingSection.hidden-mode { display: none !important; }
+    .hint-card {
+      display: block; padding: 10px 12px; border-radius: 6px;
+      background: rgba(127, 127, 127, 0.08);
+      border: 1px solid var(--vscode-panel-border, rgba(127,127,127,0.25));
+      color: var(--vscode-editor-foreground);
+    }
+    .hint-card .badge {
+      display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; margin-bottom: 6px;
+      background: rgba(127, 127, 127, 0.2);
+      color: var(--vscode-descriptionForeground, inherit);
+    }
+    #missingSection, #hintSection { margin-bottom: 28px; }
+    #missingSection.hidden-mode, #hintSection.hidden-mode { display: none !important; }
     #missingSection h2 { color: var(--vscode-errorForeground, #f14c4c); }
+    #hintSection h2 { font-weight: 600; opacity: 0.9; }
   </style>
 </head>
 <body>
@@ -724,12 +825,21 @@ export class MarkdownPane {
     <h2>文档主页</h2>
     <p>文档目录 <code id="homeDocsPath"></code> · 点击下方链接打开对应文档</p>
     <div id="missingSection" class="hidden-mode">
-      <h2>绑定缺失</h2>
-      <p>以下绑定的源文件或文档已不存在，请重新绑定或清理失效项。</p>
+      <h2>绑定提醒</h2>
+      <p>以下绑定缺失或行范围/符号可能失效，建议处理。</p>
       <ul class="doc-list" id="missingList"></ul>
     </div>
+    <div id="hintSection" class="hidden-mode">
+      <h2>文档核对提醒</h2>
+      <p>源码已变，请确认旁路文档是否仍准确。<strong>仅提醒，可忽略</strong>；核对完毕后可「标记已核对」清除提示。</p>
+      <p id="hashBulkRow" class="hidden-mode" style="margin:0 0 12px">
+        <button type="button" id="btnRefreshAllHashes" class="cta">全部标记已核对</button>
+      </p>
+      <ul class="doc-list" id="hintList"></ul>
+    </div>
     <h2 id="boundHeading">已绑定文档</h2>
-    <ul class="doc-list" id="docList"></ul>
+    <p style="margin-top:-8px">按源文件目录树排列，点击打开对应文档</p>
+    <ul class="bound-tree" id="docList"></ul>
   </div>
   <div id="unbound" class="center">
     <h2>无关联文档</h2>
@@ -754,10 +864,19 @@ export class MarkdownPane {
     const docList = document.getElementById('docList');
     const missingSection = document.getElementById('missingSection');
     const missingList = document.getElementById('missingList');
+    const hintSection = document.getElementById('hintSection');
+    const hintList = document.getElementById('hintList');
+    const hashBulkRow = document.getElementById('hashBulkRow');
+    const btnRefreshAllHashes = document.getElementById('btnRefreshAllHashes');
+    btnRefreshAllHashes.addEventListener('click', function () {
+      vscodeApi.postMessage({ type: 'refreshAllHashes' });
+    });
     const homeDocsPath = document.getElementById('homeDocsPath');
     const hint = document.getElementById('hint');
     const mdSource = document.getElementById('mdSource');
     let vditor = null;
+    let irReady = false;
+    let pendingIrReveal = false;
     let mode = 'ir';
     let applying = false;
     let pendingMarkdown = '';
@@ -805,13 +924,32 @@ export class MarkdownPane {
       setNav(canBack, canForward);
     }
 
-    function showHome(docsPath, docs, missing, canBack, canForward) {
+    function driftBadge(kind) {
+      if (kind === 'missing-doc') return '文档缺失';
+      if (kind === 'missing-target') return '源文件缺失';
+      if (kind === 'hash') return '源码已变';
+      if (kind === 'range') return '行范围失效';
+      if (kind === 'symbol') return '符号变动';
+      return kind || '提醒';
+    }
+
+    function appendBtn(parent, label, className, onClick) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      if (className) btn.className = className;
+      btn.textContent = label;
+      btn.addEventListener('click', onClick);
+      parent.appendChild(btn);
+    }
+
+    function showHome(docsPath, docs, missing, hints, canBack, canForward) {
       hideAll();
       currentDocRel = '';
       setDeleteVisible(false);
       homeDocsPath.textContent = (docsPath || 'docs') + '/';
       docList.innerHTML = '';
       missingList.innerHTML = '';
+      hintList.innerHTML = '';
 
       const missingItems = missing || [];
       if (missingItems.length) {
@@ -822,55 +960,42 @@ export class MarkdownPane {
           card.className = 'missing-card';
           const badge = document.createElement('span');
           badge.className = 'badge';
-          badge.textContent = item.kind === 'missing-doc' ? '文档缺失' : '源文件缺失';
+          badge.textContent = driftBadge(item.kind);
           const title = document.createElement('strong');
-          title.textContent = item.kind === 'missing-doc' ? item.target : item.doc;
+          title.textContent =
+            item.kind === 'missing-doc' ? item.target : (item.doc || item.target);
           const meta = document.createElement('span');
           meta.className = 'meta';
           meta.textContent = item.message;
           const actions = document.createElement('div');
           actions.className = 'actions';
+
           if (item.kind === 'missing-doc') {
-            const rebind = document.createElement('button');
-            rebind.type = 'button';
-            rebind.textContent = '重新绑定';
-            rebind.addEventListener('click', function () {
+            appendBtn(actions, '重新绑定', null, function () {
               vscodeApi.postMessage({ type: 'createBind', sourceRel: item.target });
             });
-            const openSrc = document.createElement('button');
-            openSrc.type = 'button';
-            openSrc.className = 'secondary';
-            openSrc.textContent = '打开源文件';
-            openSrc.addEventListener('click', function () {
+            appendBtn(actions, '打开源文件', 'secondary', function () {
               vscodeApi.postMessage({ type: 'openTarget', sourceRel: item.target });
             });
-            actions.appendChild(rebind);
-            actions.appendChild(openSrc);
-          } else {
-            const rebind = document.createElement('button');
-            rebind.type = 'button';
-            rebind.textContent = '重新绑定';
-            rebind.addEventListener('click', function () {
+          } else if (item.kind === 'missing-target') {
+            appendBtn(actions, '重新绑定', null, function () {
               vscodeApi.postMessage({ type: 'rebindDoc', docRel: item.doc });
             });
-            const openDocBtn = document.createElement('button');
-            openDocBtn.type = 'button';
-            openDocBtn.className = 'secondary';
-            openDocBtn.textContent = '打开此文档';
-            openDocBtn.addEventListener('click', function () {
+            appendBtn(actions, '打开此文档', 'secondary', function () {
               vscodeApi.postMessage({ type: 'openDoc', docRel: item.doc });
             });
-            const del = document.createElement('button');
-            del.type = 'button';
-            del.className = 'danger';
-            del.textContent = '删除失效文档';
-            del.addEventListener('click', function () {
+            appendBtn(actions, '删除失效文档', 'danger', function () {
               vscodeApi.postMessage({ type: 'deleteDoc', docRel: item.doc });
             });
-            actions.appendChild(rebind);
-            actions.appendChild(openDocBtn);
-            actions.appendChild(del);
+          } else {
+            appendBtn(actions, '重新绑定', null, function () {
+              vscodeApi.postMessage({ type: 'rebindDoc', docRel: item.doc });
+            });
+            appendBtn(actions, '打开文档', 'secondary', function () {
+              vscodeApi.postMessage({ type: 'openDoc', docRel: item.doc });
+            });
           }
+
           card.appendChild(badge);
           card.appendChild(document.createElement('br'));
           card.appendChild(title);
@@ -883,34 +1008,59 @@ export class MarkdownPane {
         missingSection.classList.add('hidden-mode');
       }
 
+      const hintItems = hints || [];
+      if (hintItems.length) {
+        hintSection.classList.remove('hidden-mode');
+        hashBulkRow.classList.toggle('hidden-mode', hintItems.length < 2);
+        hintItems.forEach(function (item) {
+          const li = document.createElement('li');
+          const card = document.createElement('div');
+          card.className = 'hint-card';
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.textContent = driftBadge('hash');
+          const title = document.createElement('strong');
+          title.textContent = item.doc || item.target;
+          const meta = document.createElement('span');
+          meta.className = 'meta';
+          meta.textContent = item.message || ('源文件 ' + item.target + ' 已修改');
+          const actions = document.createElement('div');
+          actions.className = 'actions';
+          appendBtn(actions, '打开文档核对', null, function () {
+            vscodeApi.postMessage({ type: 'openDoc', docRel: item.doc });
+          });
+          appendBtn(actions, '标记已核对', 'secondary', function () {
+            vscodeApi.postMessage({ type: 'refreshHash', docRel: item.doc });
+          });
+          card.appendChild(badge);
+          card.appendChild(document.createElement('br'));
+          card.appendChild(title);
+          card.appendChild(meta);
+          card.appendChild(actions);
+          li.appendChild(card);
+          hintList.appendChild(li);
+        });
+      } else {
+        hintSection.classList.add('hidden-mode');
+        hashBulkRow.classList.add('hidden-mode');
+      }
+
       if (!docs || !docs.length) {
         const li = document.createElement('li');
         li.textContent = '暂无绑定文档。打开源文件后可新建关联。';
         docList.appendChild(li);
       } else {
-        docs.forEach(function (item) {
-          const li = document.createElement('li');
-          const a = document.createElement('a');
-          a.href = '#';
-          a.dataset.doc = item.doc;
-          a.innerHTML = '<strong>' + escapeHtml(item.title || item.doc) + '</strong>'
-            + '<span class="meta">' + escapeHtml(item.doc)
-            + (item.target ? ' ← ' + escapeHtml(item.target) : '')
-            + '</span>';
-          a.addEventListener('click', function (e) {
-            e.preventDefault();
-            vscodeApi.postMessage({ type: 'openDoc', docRel: item.doc });
-          });
-          li.appendChild(a);
-          docList.appendChild(li);
-        });
+        renderBoundTree(docList, docs);
       }
       homeEl.classList.add('visible');
-      hint.textContent = missingItems.length
-        ? ('主页 · ' + missingItems.length + ' 项绑定缺失')
-        : '主页 · 选择文档打开';
+      if (missingItems.length) {
+        hint.textContent = '主页 · ' + missingItems.length + ' 项绑定提醒';
+      } else if (hintItems.length) {
+        hint.textContent = '主页 · ' + hintItems.length + ' 项文档核对提醒（可忽略）';
+      } else {
+        hint.textContent = '主页 · 选择文档打开';
+      }
       setNav(canBack, canForward);
-      warmEditor();
     }
 
     function escapeHtml(s) {
@@ -919,6 +1069,119 @@ export class MarkdownPane {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+    }
+
+    function bindingKindLabel(item) {
+      if (item.kind === 'range' && item.startLine != null && item.endLine != null) {
+        return item.symbol
+          ? 'range L' + item.startLine + '-' + item.endLine + ' · ' + item.symbol
+          : 'range L' + item.startLine + '-' + item.endLine;
+      }
+      if (item.kind === 'index') return '汇总';
+      return 'file';
+    }
+
+    function makeDocLink(item) {
+      const a = document.createElement('a');
+      a.href = '#';
+      a.dataset.doc = item.doc;
+      a.innerHTML = '<strong>' + escapeHtml(item.title || item.doc) + '</strong>'
+        + '<span class="meta">' + escapeHtml(item.doc)
+        + ' · ' + escapeHtml(bindingKindLabel(item)) + '</span>';
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        vscodeApi.postMessage({ type: 'openDoc', docRel: item.doc });
+      });
+      return a;
+    }
+
+    /** Build a directory tree from binding target paths (workspace-relative). */
+    function renderBoundTree(container, docs) {
+      const indexItems = [];
+      const root = { name: '', children: new Map(), bindings: [] };
+
+      docs.forEach(function (item) {
+        if (item.kind === 'index' || item.target === '(汇总)') {
+          indexItems.push(item);
+          return;
+        }
+        const parts = String(item.target || '').split('/').filter(Boolean);
+        if (!parts.length) {
+          root.bindings.push(item);
+          return;
+        }
+        let node = root;
+        for (let i = 0; i < parts.length; i++) {
+          const part = parts[i];
+          const isLeaf = i === parts.length - 1;
+          if (!node.children.has(part)) {
+            node.children.set(part, {
+              name: part,
+              children: new Map(),
+              bindings: [],
+              isFile: false,
+            });
+          }
+          const child = node.children.get(part);
+          if (isLeaf) {
+            child.isFile = true;
+            child.bindings.push(item);
+          }
+          node = child;
+        }
+      });
+
+      indexItems.forEach(function (item) {
+        const li = document.createElement('li');
+        li.className = 'index-item leaf';
+        li.appendChild(makeDocLink(item));
+        container.appendChild(li);
+      });
+
+      function renderNode(node, parentEl) {
+        const entries = Array.from(node.children.values()).sort(function (a, b) {
+          if (a.isFile !== b.isFile) return a.isFile ? 1 : -1;
+          return a.name.localeCompare(b.name);
+        });
+        entries.forEach(function (child) {
+          const li = document.createElement('li');
+          if (!child.isFile) {
+            const row = document.createElement('div');
+            row.className = 'folder-row';
+            row.innerHTML = '<span class="twist">▾</span><span>' + escapeHtml(child.name) + '/</span>';
+            li.appendChild(row);
+            const ul = document.createElement('ul');
+            renderNode(child, ul);
+            li.appendChild(ul);
+          } else {
+            li.className = 'file-row';
+            const label = document.createElement('div');
+            label.className = 'file-label';
+            label.textContent = child.name;
+            li.appendChild(label);
+            const ul = document.createElement('ul');
+            child.bindings
+              .slice()
+              .sort(function (a, b) { return String(a.doc).localeCompare(String(b.doc)); })
+              .forEach(function (binding) {
+                const leaf = document.createElement('li');
+                leaf.className = 'leaf';
+                leaf.appendChild(makeDocLink(binding));
+                ul.appendChild(leaf);
+              });
+            li.appendChild(ul);
+          }
+          parentEl.appendChild(li);
+        });
+        node.bindings.forEach(function (binding) {
+          const leaf = document.createElement('li');
+          leaf.className = 'leaf';
+          leaf.appendChild(makeDocLink(binding));
+          parentEl.appendChild(leaf);
+        });
+      }
+
+      renderNode(root, container);
     }
 
     function showModePane(want) {
@@ -945,7 +1208,7 @@ export class MarkdownPane {
     }
 
     function currentValue() {
-      if (mode === 'source') {
+      if (mode === 'source' || pendingIrReveal) {
         return mdSource.value;
       }
       if (vditor) {
@@ -959,6 +1222,7 @@ export class MarkdownPane {
         return false;
       }
       applying = true;
+      irReady = false;
       document.getElementById('vditorIr').innerHTML = '';
       vditor = new Vditor('vditorIr', {
         height: Math.max(240, window.innerHeight - 40),
@@ -978,7 +1242,15 @@ export class MarkdownPane {
           theme: { current: isDark() ? 'dark' : 'light' },
           hljs: { style: isDark() ? 'native' : 'github' }
         },
-        after: function () { applying = false; },
+        after: function () {
+          applying = false;
+          irReady = true;
+          if (pendingIrReveal && mode === 'ir') {
+            pendingIrReveal = false;
+            showModePane('ir');
+            try { vditor.resize(Math.max(240, window.innerHeight - 40)); } catch (_) {}
+          }
+        },
         input: function (value) {
           if (applying) return;
           pendingMarkdown = value;
@@ -1008,15 +1280,31 @@ export class MarkdownPane {
       setDeleteVisible(!!deletable);
       mode = nextMode === 'source' || nextMode === 'sv' ? 'source' : 'ir';
       setModeButtons();
-      showModePane(mode);
       showEditor(canBack, canForward);
       if (mode === 'source') {
+        pendingIrReveal = false;
         setSourceValue(pendingMarkdown);
+        showModePane('source');
         return;
       }
-      if (!ensureIr(pendingMarkdown)) {
-        setIrValue(pendingMarkdown);
+      // IR: paint source text immediately, then reveal Vditor when ready (avoids blank wait).
+      setSourceValue(pendingMarkdown);
+      if (!vditor) {
+        pendingIrReveal = true;
+        showModePane('source');
+        ensureIr(pendingMarkdown);
+        return;
       }
+      pendingIrReveal = false;
+      showModePane('ir');
+      if (!irReady) {
+        // Instance exists but still booting — keep source visible until after().
+        pendingIrReveal = true;
+        showModePane('source');
+        setIrValue(pendingMarkdown);
+        return;
+      }
+      setIrValue(pendingMarkdown);
     }
 
     function switchModeLocal(want) {
@@ -1027,30 +1315,32 @@ export class MarkdownPane {
       pendingMarkdown = currentValue();
       mode = next;
       setModeButtons();
-      showModePane(next);
       updateHint();
       if (next === 'source') {
+        pendingIrReveal = false;
         setSourceValue(pendingMarkdown);
+        showModePane('source');
       } else {
-        if (!ensureIr(pendingMarkdown)) {
+        if (!vditor) {
+          pendingIrReveal = true;
+          showModePane('source');
+          ensureIr(pendingMarkdown);
+        } else if (!irReady) {
+          pendingIrReveal = true;
           setIrValue(pendingMarkdown);
+          showModePane('source');
+        } else {
+          pendingIrReveal = false;
+          showModePane('ir');
+          setIrValue(pendingMarkdown);
+          try { vditor.resize(Math.max(240, window.innerHeight - 40)); } catch (_) {}
         }
-        try { vditor.resize(Math.max(240, window.innerHeight - 40)); } catch (_) {}
       }
       vscodeApi.postMessage({
         type: 'switchMode',
         mode: next,
         markdown: pendingMarkdown
       });
-    }
-
-    function warmEditor() {
-      if (vditor || mode === 'source') return;
-      try {
-        pendingMarkdown = '';
-        ensureIr('');
-        showModePane('ir');
-      } catch (_) {}
     }
 
     mdSource.addEventListener('input', function () {
@@ -1096,7 +1386,14 @@ export class MarkdownPane {
         return;
       }
       if (msg.type === 'home') {
-        showHome(msg.docsPath, msg.docs || [], msg.missing || [], msg.canBack, msg.canForward);
+        showHome(
+          msg.docsPath,
+          msg.docs || [],
+          msg.missing || [],
+          msg.hints || [],
+          msg.canBack,
+          msg.canForward
+        );
         return;
       }
       if (msg.type !== 'load') return;

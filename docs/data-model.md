@@ -3,7 +3,7 @@ cim:
   target: src/store/indexStore.ts
   kind: file
   symbol: IndexStore
-  contentHash: 0c6ab95e10df
+  contentHash: 9c3cbfca8c5d
 ---
 # indexStore.ts / 数据模型
 

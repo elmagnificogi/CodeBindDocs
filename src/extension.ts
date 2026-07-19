@@ -57,6 +57,16 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('cim.rebindDoc', (item?: BindingItem | { docRel?: string }) =>
       rebindDoc(getStore, item)
+    ),
+    vscode.commands.registerCommand('cim.showDriftIssues', () =>
+      driftChecker?.showIssuesPicker()
+    ),
+    vscode.commands.registerCommand(
+      'cim.refreshDocHash',
+      (item?: BindingItem | { docRel?: string }) => refreshDocHash(getStore, item)
+    ),
+    vscode.commands.registerCommand('cim.refreshAllDocHashes', () =>
+      refreshAllDocHashes()
     )
   );
 
@@ -286,20 +296,31 @@ async function bindCurrentFile(
     anchors: [{ contentHash: hash, symbol }],
   };
 
-  await store.createDocIfMissing(binding.doc, title, rel, {
-    contentHash: hash,
-    symbol,
-  });
-  await store.writeBinding(binding);
-  await store.writeDocsIndex();
+  // One write + open first; index/scan in background so the pane can paint immediately.
+  const runWrite = async () => {
+    await store.writeBinding(binding, { refreshIndex: false, title });
+  };
+  if (driftChecker) {
+    await driftChecker.runWithoutSaveHandling(runWrite);
+  } else {
+    await runWrite();
+  }
 
-  treeProvider?.refresh();
-  codeLensProvider?.refresh();
-  await driftChecker?.scanAll();
   await splitSync?.openDocUri(store.docUri(binding.doc), true);
   const scope =
     kindPick.bindKind === 'range' ? `L${startLine}-${endLine}` : '整文件';
   void vscode.window.showInformationMessage(`CIM: 已绑定 ${rel}（${scope}）→ ${binding.doc}`);
+
+  void (async () => {
+    try {
+      await store.writeDocsIndex();
+      treeProvider?.refresh();
+      codeLensProvider?.refresh();
+      await driftChecker?.scanAll({ notify: false });
+    } catch {
+      // background housekeeping must not block the editor
+    }
+  })();
 }
 
 async function revealBoundDoc(): Promise<void> {
@@ -458,7 +479,8 @@ async function deleteDoc(
   await driftChecker?.scanAll();
 
   if (wasCurrent || splitSync?.isHome()) {
-    await splitSync?.openHome(true);
+    // Stay in place: do not reveal with Beside (that shrinks/resizes editor groups).
+    await splitSync?.openHome(false);
   } else {
     await splitSync?.syncNow();
   }
@@ -603,4 +625,62 @@ async function rebindDoc(
   void vscode.window.showInformationMessage(
     `CIM: 已将 ${docRel} 重新绑定到 ${newRel}（${scope}）`
   );
+}
+
+async function refreshDocHash(
+  getStore: () => IndexStore | undefined,
+  item?: BindingItem | { binding?: Binding; docRel?: string }
+): Promise<void> {
+  const store = getStore();
+  if (!store) {
+    void vscode.window.showErrorMessage('CIM: 请先打开一个工作区文件夹。');
+    return;
+  }
+
+  let docRel =
+    item && 'binding' in item && item.binding
+      ? normalizeRelPath(item.binding.doc)
+      : item && 'docRel' in item && item.docRel
+        ? normalizeRelPath(item.docRel)
+        : splitSync?.currentDocRel();
+
+  if (!docRel) {
+    void vscode.window.showWarningMessage('CIM: 请指定要刷新哈希的文档。');
+    return;
+  }
+
+  const index = await store.read();
+  const binding = index.bindings.find((b) => normalizeRelPath(b.doc) === docRel);
+  if (!binding) {
+    void vscode.window.showWarningMessage(`CIM: 未找到绑定 ${docRel}`);
+    return;
+  }
+
+  try {
+    await refreshBindingHash(store, binding);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    void vscode.window.showErrorMessage(`CIM: 刷新哈希失败（${msg}）`);
+    return;
+  }
+
+  treeProvider?.refresh();
+  codeLensProvider?.refresh();
+  await driftChecker?.scanAll({ notify: false });
+  if (splitSync?.isHome()) {
+    await splitSync.openHome(false);
+  }
+  void vscode.window.showInformationMessage(`CIM: 已更新 ${docRel} 的 contentHash`);
+}
+
+async function refreshAllDocHashes(): Promise<void> {
+  const n = await driftChecker?.refreshAllHashes();
+  if (n == null) {
+    return;
+  }
+  treeProvider?.refresh();
+  codeLensProvider?.refresh();
+  if (n > 0 && splitSync?.isHome()) {
+    await splitSync.openHome(false);
+  }
 }

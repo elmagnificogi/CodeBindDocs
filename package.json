@@ -60,6 +60,18 @@
       {
         "command": "cim.rebindDoc",
         "title": "CIM: Rebind Doc to Source"
+      },
+      {
+        "command": "cim.showDriftIssues",
+        "title": "CIM: Show Binding Drift"
+      },
+      {
+        "command": "cim.refreshDocHash",
+        "title": "CIM: Refresh Doc contentHash"
+      },
+      {
+        "command": "cim.refreshAllDocHashes",
+        "title": "CIM: Mark All Docs Checked (contentHash)"
       }
     ],
     "viewsContainers": {
