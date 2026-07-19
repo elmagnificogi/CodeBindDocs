@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { IndexStore } from '../store/indexStore';
 import { Binding, normalizeRelPath } from '../store/types';
+import { findOverlappingRangePairs } from '../util/rangeOverlap';
+import { findSymbolLine, resolveSymbolLineRange } from '../util/symbolRange';
 
 export type DriftSeverity = 'info' | 'warning';
 
@@ -10,7 +12,8 @@ export type DriftKind =
   | 'hash'
   | 'range'
   | 'symbol'
-  | 'renamed';
+  | 'renamed'
+  | 'overlap';
 
 export interface DriftIssue {
   bindingId: string;
@@ -126,6 +129,19 @@ export class DriftChecker {
       found.push(...hashIssues);
     }
 
+    for (const pair of findOverlappingRangePairs(index.bindings)) {
+      const aRange = `L${pair.a.target.startLine}-${pair.a.target.endLine}`;
+      const bRange = `L${pair.b.target.startLine}-${pair.b.target.endLine}`;
+      found.push({
+        bindingId: pair.a.id,
+        targetPath: pair.path,
+        doc: pair.a.doc,
+        kind: 'overlap',
+        severity: 'warning',
+        message: `代码块范围与「${pair.b.doc}」重叠（${aRange} ∩ ${bRange}）`,
+      });
+    }
+
     const previousKeys = new Set(this.notifiedKeys);
     this.issues = found;
     // Drop notified keys that no longer apply
@@ -226,6 +242,79 @@ export class DriftChecker {
     await this.scanAll({ notify: false });
     void vscode.window.showInformationMessage(`CIM: 已标记 ${n} 个文档为已核对`);
     return n;
+  }
+
+  /**
+   * Recalculate range start/end from binding symbol (DocumentSymbol or heuristic).
+   * Returns the new span, or undefined if the symbol cannot be resolved.
+   */
+  async retightenBindingBySymbol(docRel: string): Promise<{ startLine: number; endLine: number } | undefined> {
+    const store = this.getStore();
+    if (!store) {
+      return undefined;
+    }
+    const index = await store.read();
+    const binding = index.bindings.find((b) => normalizeRelPath(b.doc) === normalizeRelPath(docRel));
+    if (!binding) {
+      void vscode.window.showWarningMessage(`CIM: 未找到绑定 ${docRel}`);
+      return undefined;
+    }
+    const symbol = binding.anchors?.[0]?.symbol?.trim();
+    if (!symbol) {
+      void vscode.window.showWarningMessage('CIM: 该绑定没有 symbol，无法按符号重算行号。');
+      return undefined;
+    }
+    if (binding.target.kind !== 'range') {
+      void vscode.window.showWarningMessage('CIM: 仅代码块（range）绑定支持按 symbol 重算。');
+      return undefined;
+    }
+
+    const prevStart = binding.target.startLine;
+    const prevEnd = binding.target.endLine;
+    const previousSpan =
+      typeof prevStart === 'number' && typeof prevEnd === 'number'
+        ? Math.max(0, prevEnd - prevStart)
+        : undefined;
+
+    const targetUri = store.targetUri(binding.target.path);
+    let span;
+    try {
+      span = await resolveSymbolLineRange(targetUri, symbol, previousSpan);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      void vscode.window.showErrorMessage(`CIM: 重算行号失败（${msg}）`);
+      return undefined;
+    }
+    if (!span) {
+      void vscode.window.showWarningMessage(`CIM: 未找到符号「${symbol}」，请改绑或手改行号。`);
+      return undefined;
+    }
+
+    const oldLabel =
+      typeof prevStart === 'number' && typeof prevEnd === 'number'
+        ? `L${prevStart}-${prevEnd}`
+        : '原范围';
+    if (span.startLine === prevStart && span.endLine === prevEnd) {
+      void vscode.window.showInformationMessage(
+        `CIM: ${docRel} 行号已是最新（${oldLabel} · ${symbol}）`
+      );
+      await refreshBindingHash(store, binding);
+      await this.scanAll({ notify: false });
+      return span;
+    }
+
+    binding.target.startLine = span.startLine;
+    binding.target.endLine = span.endLine;
+    await this.runWithoutSaveHandling(async () => {
+      await refreshBindingHash(store, binding);
+    });
+    await store.writeDocsIndex();
+    this.notifiedKeys.clear();
+    await this.scanAll({ notify: false });
+    void vscode.window.showInformationMessage(
+      `CIM: 已按「${symbol}」重算 ${docRel}：${oldLabel} → L${span.startLine}-${span.endLine}`
+    );
+    return span;
   }
 
   private async checkAnchors(
@@ -395,6 +484,7 @@ export class DriftChecker {
         i.kind === 'hash' ||
         i.kind === 'range' ||
         i.kind === 'symbol' ||
+        i.kind === 'overlap' ||
         i.kind === 'missing-target' ||
         i.kind === 'missing-doc'
     );
@@ -469,7 +559,12 @@ export class DriftChecker {
       actions.push('重新绑定');
     } else if (issue.kind === 'missing-target') {
       actions.push('重新绑定', '删除文档');
-    } else if (issue.kind === 'range' || issue.kind === 'symbol') {
+    } else if (issue.kind === 'symbol' || issue.kind === 'range') {
+      if (!issue.message.includes('未找到符号')) {
+        actions.push('按 symbol 重算行号');
+      }
+      actions.push('重新绑定');
+    } else if (issue.kind === 'overlap') {
       actions.push('重新绑定');
     }
     if (issue.kind === 'missing-doc') {
@@ -480,7 +575,7 @@ export class DriftChecker {
     actions.push('忽略');
 
     const title =
-      issue.kind === 'range' || issue.kind === 'symbol'
+      issue.kind === 'range' || issue.kind === 'symbol' || issue.kind === 'overlap'
         ? `CIM 绑定关系可能已变更`
         : `CIM 绑定异常`;
 
@@ -490,6 +585,10 @@ export class DriftChecker {
     );
 
     if (!pick || pick === '忽略') {
+      return;
+    }
+    if (pick === '按 symbol 重算行号') {
+      await this.retightenBindingBySymbol(issue.doc);
       return;
     }
     if (pick === '重新绑定') {
@@ -583,6 +682,8 @@ function driftKindLabel(kind: DriftKind): string {
       return '文档缺失';
     case 'hash':
       return '文档核对提醒';
+    case 'overlap':
+      return '范围重叠';
     case 'range':
       return '行范围失效';
     case 'symbol':
@@ -592,28 +693,6 @@ function driftKindLabel(kind: DriftKind): string {
     default:
       return kind;
   }
-}
-
-/** Best-effort symbol line lookup for common JS/TS declarations. */
-export function findSymbolLine(text: string, symbol: string): number | undefined {
-  const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const patterns = [
-    new RegExp(`(?:export\\s+)?(?:default\\s+)?(?:async\\s+)?function\\s+${escaped}\\b`),
-    new RegExp(`(?:export\\s+)?(?:abstract\\s+)?class\\s+${escaped}\\b`),
-    new RegExp(`(?:export\\s+)?(?:async\\s+)?function\\*?\\s+${escaped}\\b`),
-    new RegExp(`(?:export\\s+)?(?:const|let|var)\\s+${escaped}\\b`),
-    new RegExp(`(?:export\\s+)?(?:type|interface|enum)\\s+${escaped}\\b`),
-    new RegExp(`${escaped}\\s*=\\s*(?:async\\s*)?(?:function|\\()`),
-  ];
-  const lines = text.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    for (const re of patterns) {
-      if (re.test(lines[i])) {
-        return i + 1;
-      }
-    }
-  }
-  return undefined;
 }
 
 /** Refresh file-level contentHash in Markdown frontmatter after bind. */
@@ -632,3 +711,6 @@ export async function refreshBindingHash(
   }
   await store.writeBinding(binding);
 }
+
+/** @deprecated import from util/symbolRange — re-exported for existing callers. */
+export { findSymbolLine } from '../util/symbolRange';

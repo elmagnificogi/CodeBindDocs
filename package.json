@@ -44,6 +44,10 @@
         "title": "CIM: Open Bound Source"
       },
       {
+        "command": "cim.revealSourceRange",
+        "title": "CIM: Reveal Source Range"
+      },
+      {
         "command": "cim.openDoc",
         "title": "CIM: Open Bound Doc"
       },
@@ -60,6 +64,10 @@
       {
         "command": "cim.rebindDoc",
         "title": "CIM: Rebind Doc to Source"
+      },
+      {
+        "command": "cim.retightenRange",
+        "title": "CIM: Retighten Range by Symbol"
       },
       {
         "command": "cim.showDriftIssues",

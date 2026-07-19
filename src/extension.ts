@@ -11,6 +11,8 @@ import {
   pickLineRangeInEditor,
   registerRangePickerCommands,
 } from './util/rangePicker';
+import { DOC_TEMPLATES, docBodyFromTemplate } from './util/docTemplates';
+import { findOverlapsWithExisting } from './util/rangeOverlap';
 
 let splitSync: SplitSync | undefined;
 let driftChecker: DriftChecker | undefined;
@@ -50,6 +52,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('cim.toggleSplitSync', () => toggleSplitSync()),
     vscode.commands.registerCommand('cim.refreshTree', () => refreshAll()),
     vscode.commands.registerCommand('cim.openTarget', (item?: BindingItem) => openTarget(getStore, item)),
+    vscode.commands.registerCommand(
+      'cim.revealSourceRange',
+      (arg?: BindingItem | { docRel?: string; sourceRel?: string; startLine?: number; endLine?: number }) =>
+        revealSourceRange(getStore, arg)
+    ),
     vscode.commands.registerCommand('cim.openDoc', (item?: BindingItem) => openDoc(getStore, item)),
     vscode.commands.registerCommand('cim.openDocsIndex', () => openDocsIndex(getStore)),
     vscode.commands.registerCommand('cim.deleteDoc', (item?: BindingItem | { docRel?: string }) =>
@@ -57,6 +64,10 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('cim.rebindDoc', (item?: BindingItem | { docRel?: string }) =>
       rebindDoc(getStore, item)
+    ),
+    vscode.commands.registerCommand(
+      'cim.retightenRange',
+      (item?: BindingItem | { docRel?: string }) => retightenRange(item)
     ),
     vscode.commands.registerCommand('cim.showDriftIssues', () =>
       driftChecker?.showIssuesPicker()
@@ -230,6 +241,29 @@ async function bindCurrentFile(
   const index = await store.read();
   const forFile = store.findBindingsForTarget(index, rel);
 
+  if (
+    kindPick.bindKind === 'range' &&
+    typeof startLine === 'number' &&
+    typeof endLine === 'number'
+  ) {
+    const overlaps = findOverlapsWithExisting(forFile, rel, startLine, endLine);
+    if (overlaps.length) {
+      const detail = overlaps
+        .slice(0, 3)
+        .map((b) => `${b.doc} (L${b.target.startLine}-${b.target.endLine})`)
+        .join('、');
+      const go = await vscode.window.showWarningMessage(
+        `所选范围与已有代码块绑定重叠：${detail}${overlaps.length > 3 ? '…' : ''}。仍要继续？`,
+        { modal: true },
+        '继续绑定',
+        '取消'
+      );
+      if (go !== '继续绑定') {
+        return;
+      }
+    }
+  }
+
   if (kindPick.bindKind === 'file') {
     const existing = forFile.find((b) => b.target.kind === 'file');
     if (existing) {
@@ -282,6 +316,18 @@ async function bindCurrentFile(
     return;
   }
 
+  const templatePick = await vscode.window.showQuickPick(
+    DOC_TEMPLATES.map((t) => ({
+      label: t.label,
+      description: t.description,
+      id: t.id,
+    })),
+    { placeHolder: '选择文档模板' }
+  );
+  if (!templatePick) {
+    return;
+  }
+
   const title =
     kindPick.bindKind === 'range'
       ? `${rel.split('/').pop()} ${symbol ?? `L${startLine}-${endLine}`}`
@@ -301,7 +347,11 @@ async function bindCurrentFile(
 
   // One write + open first; index/scan in background so the pane can paint immediately.
   const runWrite = async () => {
-    await store.writeBinding(binding, { refreshIndex: false, title });
+    await store.writeBinding(binding, {
+      refreshIndex: false,
+      title,
+      body: docBodyFromTemplate(templatePick.id, title),
+    });
   };
   if (driftChecker) {
     await driftChecker.runWithoutSaveHandling(runWrite);
@@ -379,23 +429,94 @@ async function openTarget(
   getStore: () => IndexStore | undefined,
   item?: BindingItem
 ): Promise<void> {
-  const store = getStore();
-  if (!store || !item) {
+  if (!item?.binding) {
     return;
   }
-  const uri = store.targetUri(item.binding.target.path);
-  const doc = await vscode.workspace.openTextDocument(uri);
-  const editor = await vscode.window.showTextDocument(doc, {
-    viewColumn: vscode.ViewColumn.One,
+  await revealSourceRange(getStore, {
+    sourceRel: item.binding.target.path,
+    startLine: item.binding.target.startLine,
+    endLine: item.binding.target.endLine,
   });
-  if (
-    item.binding.target.kind === 'range' &&
-    typeof item.binding.target.startLine === 'number'
-  ) {
-    const line = Math.max(0, item.binding.target.startLine - 1);
-    const pos = new vscode.Position(line, 0);
-    editor.selection = new vscode.Selection(pos, pos);
-    editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+}
+
+/** Open source and select the bound line range (or just go to file). */
+async function revealSourceRange(
+  getStore: () => IndexStore | undefined,
+  arg?:
+    | BindingItem
+    | {
+        docRel?: string;
+        sourceRel?: string;
+        startLine?: number;
+        endLine?: number;
+      }
+): Promise<void> {
+  const store = getStore();
+  if (!store) {
+    return;
+  }
+
+  let sourceRel: string | undefined;
+  let startLine: number | undefined;
+  let endLine: number | undefined;
+
+  if (arg && 'binding' in arg && arg.binding) {
+    sourceRel = arg.binding.target.path;
+    startLine = arg.binding.target.startLine;
+    endLine = arg.binding.target.endLine;
+  } else if (arg && 'sourceRel' in arg && arg.sourceRel) {
+    sourceRel = arg.sourceRel;
+    startLine = arg.startLine;
+    endLine = arg.endLine;
+  } else {
+    const docRel =
+      arg && 'docRel' in arg && arg.docRel
+        ? normalizeRelPath(arg.docRel)
+        : splitSync?.currentDocRel();
+    if (!docRel) {
+      void vscode.window.showWarningMessage('CIM: 请先打开一篇绑定文档。');
+      return;
+    }
+    const index = await store.read();
+    const binding = store.findByDocPath(index, docRel);
+    if (!binding) {
+      void vscode.window.showWarningMessage(`CIM: 未找到绑定 ${docRel}`);
+      return;
+    }
+    sourceRel = binding.target.path;
+    startLine = binding.target.startLine;
+    endLine = binding.target.endLine;
+  }
+
+  if (!sourceRel) {
+    return;
+  }
+
+  const uri = store.targetUri(sourceRel);
+  try {
+    const doc = await vscode.workspace.openTextDocument(uri);
+    const editor = await vscode.window.showTextDocument(doc, {
+      viewColumn: vscode.ViewColumn.One,
+      preserveFocus: false,
+    });
+    if (typeof startLine === 'number') {
+      const start = Math.max(0, startLine - 1);
+      const end =
+        typeof endLine === 'number'
+          ? Math.max(start, Math.min(doc.lineCount, endLine) - 1)
+          : start;
+      const startPos = new vscode.Position(start, 0);
+      const endLineText = doc.lineAt(end);
+      const endPos = new vscode.Position(end, endLineText.text.length);
+      editor.selection = new vscode.Selection(startPos, endPos);
+      editor.revealRange(
+        new vscode.Range(startPos, endPos),
+        vscode.TextEditorRevealType.InCenterIfOutsideViewport
+      );
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    void vscode.window.showWarningMessage(`CIM: 无法打开源文件（${msg}）`);
   }
 }
 
@@ -633,6 +754,35 @@ async function rebindDoc(
   void vscode.window.showInformationMessage(
     `CIM: 已将 ${docRel} 重新绑定到 ${newRel}（${scope}）`
   );
+}
+
+async function retightenRange(item?: BindingItem | { docRel?: string }): Promise<void> {
+  let docRel =
+    item && 'binding' in item && item.binding
+      ? normalizeRelPath(item.binding.doc)
+      : item && 'docRel' in item && item.docRel
+        ? normalizeRelPath(item.docRel)
+        : splitSync?.currentDocRel();
+
+  if (!docRel) {
+    void vscode.window.showWarningMessage('CIM: 请指定要重算行号的文档。');
+    return;
+  }
+
+  const span = await driftChecker?.retightenBindingBySymbol(docRel);
+  if (!span) {
+    return;
+  }
+  treeProvider?.refresh();
+  codeLensProvider?.refresh();
+  if (splitSync?.isHome()) {
+    await splitSync.openHome(false);
+  } else {
+    const store = getWorkspaceStore();
+    if (store && splitSync?.currentDocRel() === docRel) {
+      await splitSync.openDocUri(store.docUri(docRel), false);
+    }
+  }
 }
 
 async function refreshDocHash(

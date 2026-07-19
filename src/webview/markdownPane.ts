@@ -18,10 +18,17 @@ type DocListItem = {
 };
 
 type MissingItem = {
-  kind: 'missing-target' | 'missing-doc' | 'hash' | 'range' | 'symbol';
+  kind: 'missing-target' | 'missing-doc' | 'hash' | 'range' | 'symbol' | 'overlap';
   target: string;
   doc: string;
   message: string;
+};
+
+type SourceJump = {
+  path: string;
+  kind: 'file' | 'range';
+  startLine?: number;
+  endLine?: number;
 };
 
 type HostToWeb =
@@ -32,6 +39,8 @@ type HostToWeb =
       mode: DocMode;
       docRel: string;
       deletable: boolean;
+      /** When set, show「定位源码」and jump to this range/file. */
+      sourceJump?: SourceJump;
       canBack: boolean;
       canForward: boolean;
     }
@@ -64,8 +73,9 @@ type WebToHost =
   | { type: 'navForward' }
   | { type: 'openDoc'; docRel: string }
   | { type: 'deleteDoc'; docRel: string }
-  | { type: 'openTarget'; sourceRel: string }
+  | { type: 'openTarget'; sourceRel: string; startLine?: number; endLine?: number }
   | { type: 'rebindDoc'; docRel: string }
+  | { type: 'retightenRange'; docRel: string }
   | { type: 'refreshHash'; docRel: string }
   | { type: 'refreshAllHashes' };
 
@@ -375,7 +385,8 @@ export class MarkdownPane {
         issue.kind !== 'missing-target' &&
         issue.kind !== 'missing-doc' &&
         issue.kind !== 'range' &&
-        issue.kind !== 'symbol'
+        issue.kind !== 'symbol' &&
+        issue.kind !== 'overlap'
       ) {
         continue;
       }
@@ -497,6 +508,12 @@ export class MarkdownPane {
         });
         return;
       }
+      if (msg.type === 'retightenRange') {
+        await vscode.commands.executeCommand('cim.retightenRange', {
+          docRel: msg.docRel,
+        });
+        return;
+      }
       if (msg.type === 'refreshHash') {
         await vscode.commands.executeCommand('cim.refreshDocHash', {
           docRel: msg.docRel,
@@ -508,17 +525,11 @@ export class MarkdownPane {
         return;
       }
       if (msg.type === 'openTarget') {
-        const store = this.getStore();
-        if (!store) {
-          return;
-        }
-        const uri = store.targetUri(normalizeRelPath(msg.sourceRel));
-        try {
-          const doc = await vscode.workspace.openTextDocument(uri);
-          await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One });
-        } catch {
-          void vscode.window.showWarningMessage(`CIM: 无法打开源文件 ${msg.sourceRel}`);
-        }
+        await vscode.commands.executeCommand('cim.revealSourceRange', {
+          sourceRel: msg.sourceRel,
+          startLine: msg.startLine,
+          endLine: msg.endLine,
+        });
         return;
       }
       if (msg.type === 'switchMode') {
@@ -571,6 +582,23 @@ export class MarkdownPane {
       const deletable = Boolean(
         store && docRel && store.isUnderDocsPath(docRel) && !store.isIndexDoc(docRel)
       );
+      let sourceJump: SourceJump | undefined;
+      if (store && docRel && !store.isIndexDoc(docRel)) {
+        try {
+          const index = await store.read();
+          const binding = store.findByDocPath(index, docRel);
+          if (binding) {
+            sourceJump = {
+              path: binding.target.path,
+              kind: binding.target.kind === 'range' ? 'range' : 'file',
+              startLine: binding.target.startLine,
+              endLine: binding.target.endLine,
+            };
+          }
+        } catch {
+          // ignore
+        }
+      }
       const payload: HostToWeb = {
         type: 'load',
         title,
@@ -579,6 +607,7 @@ export class MarkdownPane {
         mode: this.mode,
         docRel,
         deletable,
+        sourceJump,
         ...this.navFlags(),
       };
       await this.panel.webview.postMessage(payload);
@@ -761,12 +790,14 @@ export class MarkdownPane {
     .bound-tree { list-style: none; padding: 0; margin: 0; }
     .bound-tree ul { list-style: none; padding: 0 0 0 14px; margin: 2px 0 6px;
       border-left: 1px solid var(--vscode-panel-border, rgba(127,127,127,0.35)); }
+    .bound-tree ul.collapsed { display: none; }
     .bound-tree .folder-row {
       display: flex; align-items: center; gap: 6px;
       padding: 4px 2px; font-size: 12px; font-weight: 600;
       font-family: var(--vscode-editor-font-family);
-      opacity: 0.8; user-select: none;
+      opacity: 0.8; user-select: none; cursor: pointer; border-radius: 4px;
     }
+    .bound-tree .folder-row:hover { opacity: 1; background: rgba(127,127,127,0.1); }
     .bound-tree .folder-row .twist {
       display: inline-block; width: 12px; opacity: 0.55; font-size: 10px;
     }
@@ -774,8 +805,13 @@ export class MarkdownPane {
       margin: 0 0 6px;
     }
     .bound-tree .file-label {
-      padding: 2px 2px 4px; font-size: 12px;
-      font-family: var(--vscode-editor-font-family); opacity: 0.7;
+      display: inline-block; padding: 2px 4px; font-size: 12px; border-radius: 4px;
+      font-family: var(--vscode-editor-font-family);
+      color: var(--vscode-textLink-foreground);
+      cursor: pointer; user-select: none;
+    }
+    .bound-tree .file-label:hover {
+      background: rgba(127,127,127,0.12); text-decoration: underline;
     }
     .bound-tree .leaf a {
       display: block; padding: 8px 10px; border-radius: 6px; text-decoration: none;
@@ -838,6 +874,7 @@ export class MarkdownPane {
       <button type="button" id="btnIr" class="active">即时渲染</button>
       <button type="button" id="btnSource">源码</button>
       <span class="sep"></span>
+      <button type="button" id="btnRevealSource" class="hidden-mode" title="在左侧打开并选中绑定的源码范围">定位源码</button>
       <button type="button" id="btnDelete" class="danger hidden-mode" title="删除此文档">删除</button>
     </span>
     <span class="hint" id="hint">输入 Markdown 即时渲染 · YAML 头已隐藏</span>
@@ -865,7 +902,7 @@ export class MarkdownPane {
       <ul class="doc-list" id="hintList"></ul>
     </div>
     <h2 id="boundHeading">已绑定文档</h2>
-    <p style="margin-top:-8px">按源文件目录树排列，点击打开对应文档</p>
+    <p style="margin-top:-8px">按源文件目录树排列 · 点文件夹折叠 · 点源文件名打开源码 · 点文档打开旁路文档</p>
     <ul class="bound-tree" id="docList"></ul>
   </div>
   <div id="unbound" class="center">
@@ -879,6 +916,7 @@ export class MarkdownPane {
     const btnIr = document.getElementById('btnIr');
     const btnSource = document.getElementById('btnSource');
     const btnDelete = document.getElementById('btnDelete');
+    const btnRevealSource = document.getElementById('btnRevealSource');
     const btnBack = document.getElementById('btnBack');
     const btnForward = document.getElementById('btnForward');
     const btnHome = document.getElementById('btnHome');
@@ -910,6 +948,7 @@ export class MarkdownPane {
     let pendingMarkdown = '';
     let unboundSourceRel = '';
     let currentDocRel = '';
+    let sourceJump = null;
 
     function isDark() {
       return document.body.classList.contains('vscode-dark')
@@ -923,6 +962,20 @@ export class MarkdownPane {
 
     function setDeleteVisible(visible) {
       btnDelete.classList.toggle('hidden-mode', !visible);
+    }
+
+    function setRevealSourceVisible(jump) {
+      sourceJump = jump || null;
+      const show = !!(jump && jump.path);
+      btnRevealSource.classList.toggle('hidden-mode', !show);
+      if (show && jump.kind === 'range' && jump.startLine != null) {
+        btnRevealSource.title =
+          '定位源码 L' + jump.startLine + (jump.endLine != null ? '-' + jump.endLine : '');
+        btnRevealSource.textContent = '定位源码';
+      } else if (show) {
+        btnRevealSource.title = '打开绑定的源文件';
+        btnRevealSource.textContent = '打开源码';
+      }
     }
 
     function setNav(canBack, canForward) {
@@ -970,6 +1023,7 @@ export class MarkdownPane {
       unboundSourceRel = sourceRel || '';
       currentDocRel = '';
       setDeleteVisible(false);
+      setRevealSourceVisible(null);
       unboundPath.textContent = unboundSourceRel;
       unboundEl.classList.add('visible');
       const allowCreate = canCreate !== false;
@@ -985,6 +1039,7 @@ export class MarkdownPane {
       if (kind === 'missing-doc') return '文档缺失';
       if (kind === 'missing-target') return '源文件缺失';
       if (kind === 'hash') return '源码已变';
+      if (kind === 'overlap') return '范围重叠';
       if (kind === 'range') return '行范围失效';
       if (kind === 'symbol') return '符号变动';
       return kind || '提醒';
@@ -1003,6 +1058,7 @@ export class MarkdownPane {
       hideAll();
       currentDocRel = '';
       setDeleteVisible(false);
+      setRevealSourceVisible(null);
       homeDocsPath.textContent = (docsPath || 'docs') + '/';
       docList.innerHTML = '';
       missingList.innerHTML = '';
@@ -1043,6 +1099,29 @@ export class MarkdownPane {
             });
             appendBtn(actions, '删除失效文档', 'danger', function () {
               vscodeApi.postMessage({ type: 'deleteDoc', docRel: item.doc });
+            });
+          } else if (item.kind === 'overlap') {
+            appendBtn(actions, '打开文档', null, function () {
+              vscodeApi.postMessage({ type: 'openDoc', docRel: item.doc });
+            });
+            appendBtn(actions, '定位源码', 'secondary', function () {
+              vscodeApi.postMessage({ type: 'openTarget', sourceRel: item.target });
+            });
+            appendBtn(actions, '重新绑定', 'secondary', function () {
+              vscodeApi.postMessage({ type: 'rebindDoc', docRel: item.doc });
+            });
+          } else if (item.kind === 'symbol' || item.kind === 'range') {
+            const canRetighten = String(item.message || '').indexOf('未找到符号') < 0;
+            if (canRetighten) {
+              appendBtn(actions, '按 symbol 重算行号', null, function () {
+                vscodeApi.postMessage({ type: 'retightenRange', docRel: item.doc });
+              });
+            }
+            appendBtn(actions, '重新绑定', canRetighten ? 'secondary' : null, function () {
+              vscodeApi.postMessage({ type: 'rebindDoc', docRel: item.doc });
+            });
+            appendBtn(actions, '打开文档', 'secondary', function () {
+              vscodeApi.postMessage({ type: 'openDoc', docRel: item.doc });
             });
           } else {
             appendBtn(actions, '重新绑定', null, function () {
@@ -1154,9 +1233,28 @@ export class MarkdownPane {
     }
 
     /** Build a directory tree from binding target paths (workspace-relative). */
+    function loadBoundTreeCollapsed() {
+      try {
+        const st = vscodeApi.getState() || {};
+        return new Set(Array.isArray(st.boundTreeCollapsed) ? st.boundTreeCollapsed : []);
+      } catch (_) {
+        return new Set();
+      }
+    }
+
+    function saveBoundTreeCollapsed(collapsed) {
+      try {
+        const prev = vscodeApi.getState() || {};
+        vscodeApi.setState(Object.assign({}, prev, {
+          boundTreeCollapsed: Array.from(collapsed)
+        }));
+      } catch (_) {}
+    }
+
     function renderBoundTree(container, docs) {
       const indexItems = [];
       const root = { name: '', children: new Map(), bindings: [] };
+      const collapsedFolders = loadBoundTreeCollapsed();
 
       docs.forEach(function (item) {
         if (item.kind === 'index' || item.target === '(汇总)') {
@@ -1196,26 +1294,55 @@ export class MarkdownPane {
         container.appendChild(li);
       });
 
-      function renderNode(node, parentEl) {
+      function renderNode(node, parentEl, pathPrefix) {
         const entries = Array.from(node.children.values()).sort(function (a, b) {
           if (a.isFile !== b.isFile) return a.isFile ? 1 : -1;
           return a.name.localeCompare(b.name);
         });
         entries.forEach(function (child) {
           const li = document.createElement('li');
+          const childPath = pathPrefix ? pathPrefix + '/' + child.name : child.name;
           if (!child.isFile) {
+            const isCollapsed = collapsedFolders.has(childPath);
             const row = document.createElement('div');
             row.className = 'folder-row';
-            row.innerHTML = '<span class="twist">▾</span><span>' + escapeHtml(child.name) + '/</span>';
+            row.setAttribute('role', 'button');
+            row.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+            row.title = (isCollapsed ? '展开' : '折叠') + ' ' + childPath;
+            const twist = document.createElement('span');
+            twist.className = 'twist';
+            twist.textContent = isCollapsed ? '▸' : '▾';
+            const name = document.createElement('span');
+            name.textContent = child.name + '/';
+            row.appendChild(twist);
+            row.appendChild(name);
             li.appendChild(row);
             const ul = document.createElement('ul');
-            renderNode(child, ul);
+            if (isCollapsed) ul.classList.add('collapsed');
+            renderNode(child, ul, childPath);
             li.appendChild(ul);
+            row.addEventListener('click', function () {
+              const nowCollapsed = ul.classList.toggle('collapsed');
+              twist.textContent = nowCollapsed ? '▸' : '▾';
+              row.setAttribute('aria-expanded', nowCollapsed ? 'false' : 'true');
+              row.title = (nowCollapsed ? '展开' : '折叠') + ' ' + childPath;
+              if (nowCollapsed) collapsedFolders.add(childPath);
+              else collapsedFolders.delete(childPath);
+              saveBoundTreeCollapsed(collapsedFolders);
+            });
           } else {
             li.className = 'file-row';
-            const label = document.createElement('div');
+            const sourcePath =
+              (child.bindings[0] && child.bindings[0].target) || childPath;
+            const label = document.createElement('span');
             label.className = 'file-label';
+            label.setAttribute('role', 'link');
+            label.title = '打开源文件 ' + sourcePath;
             label.textContent = child.name;
+            label.addEventListener('click', function (e) {
+              e.preventDefault();
+              vscodeApi.postMessage({ type: 'openTarget', sourceRel: sourcePath });
+            });
             li.appendChild(label);
             const ul = document.createElement('ul');
             child.bindings
@@ -1239,7 +1366,7 @@ export class MarkdownPane {
         });
       }
 
-      renderNode(root, container);
+      renderNode(root, container, '');
     }
 
     function showModePane(want) {
@@ -1343,10 +1470,11 @@ export class MarkdownPane {
       try { vditor && vditor.resize(Math.max(240, window.innerHeight - 40)); } catch (_) {}
     }
 
-    function applyMarkdown(markdown, nextMode, canBack, canForward, docRel, deletable) {
+    function applyMarkdown(markdown, nextMode, canBack, canForward, docRel, deletable, jump) {
       pendingMarkdown = markdown || '';
       currentDocRel = docRel || '';
       setDeleteVisible(!!deletable);
+      setRevealSourceVisible(jump);
       mode = nextMode === 'source' || nextMode === 'sv' ? 'source' : 'ir';
       setModeButtons();
       showEditor(canBack, canForward);
@@ -1425,6 +1553,15 @@ export class MarkdownPane {
     btnSource.addEventListener('click', function () {
       switchModeLocal('source');
     });
+    btnRevealSource.addEventListener('click', function () {
+      if (!sourceJump || !sourceJump.path) return;
+      vscodeApi.postMessage({
+        type: 'openTarget',
+        sourceRel: sourceJump.path,
+        startLine: sourceJump.startLine,
+        endLine: sourceJump.endLine
+      });
+    });
     btnDelete.addEventListener('click', function () {
       if (!currentDocRel) return;
       vscodeApi.postMessage({ type: 'deleteDoc', docRel: currentDocRel });
@@ -1478,7 +1615,8 @@ export class MarkdownPane {
         msg.canBack,
         msg.canForward,
         msg.docRel || '',
-        !!msg.deletable
+        !!msg.deletable,
+        msg.sourceJump || null
       );
     });
 

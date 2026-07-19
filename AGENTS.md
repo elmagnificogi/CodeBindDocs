@@ -28,6 +28,9 @@
 | `src/views/cimCodeLens.ts` | `docs/views-codelens.md` |
 | `src/agent/scaffold.ts` | `docs/agent-scaffold.md` |
 | `src/util/rangePicker.ts` | `docs/util-rangePicker.md` |
+| `src/util/docTemplates.ts` | `docs/util-docTemplates.md` |
+| `src/util/rangeOverlap.ts` | `docs/util-rangeOverlap.md` |
+| `src/util/symbolRange.ts` | `docs/util-symbolRange.md` |
 
 ## 绑定格式
 
@@ -59,3 +62,4 @@ cim:
 - `CIM: Show Binding Drift` — 查看绑定漂移并处理
 - `CIM: Refresh Doc contentHash` — 刷新文档内容哈希
 - `CIM: Reveal Bound Doc` — 打开当前文件的绑定文档
+- `CIM: Reveal Source Range` — 从文档跳到源码并选中绑定范围

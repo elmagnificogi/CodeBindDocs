@@ -149,19 +149,26 @@ export class IndexStore {
 
   async writeBinding(
     binding: Binding,
-    options?: { refreshIndex?: boolean; title?: string }
+    options?: { refreshIndex?: boolean; title?: string; body?: string }
   ): Promise<void> {
     const uri = this.docUri(binding.doc);
     const fallbackTitle =
       options?.title ?? binding.target.path.split('/').pop() ?? binding.target.path;
-    let body = defaultDocBody(fallbackTitle);
+    let body = options?.body ?? defaultDocBody(fallbackTitle);
+    let existed = false;
     try {
       const raw = await vscode.workspace.fs.readFile(uri);
       const text = Buffer.from(raw).toString('utf8');
+      existed = true;
       body = parseCimFrontmatter(text).body || body;
     } catch {
       const parent = vscode.Uri.joinPath(uri, '..');
       await vscode.workspace.fs.createDirectory(parent);
+    }
+
+    // New file: prefer explicit template body.
+    if (!existed && options?.body) {
+      body = options.body;
     }
 
     const content = serializeCimFrontmatter(bindingToFrontmatter(binding), body);

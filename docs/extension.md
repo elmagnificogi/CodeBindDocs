@@ -3,7 +3,7 @@ cim:
   target: src/extension.ts
   kind: file
   symbol: activate
-  contentHash: 4c2aa9be1f5f
+  contentHash: 633f7f5e75e1
 ---
 # extension.ts
 
@@ -22,11 +22,13 @@ cim:
 | 命令 | 作用 |
 |------|------|
 | `cim.initialize` | 文档目录、脚手架 |
-| `cim.bindCurrentFile` | 整文件或代码块绑定 |
+| `cim.bindCurrentFile` | 整文件或代码块绑定（可选文档模板；range 重叠二次确认） |
 | `cim.revealBoundDoc` | 打开当前文件绑定文档 |
+| `cim.revealSourceRange` | 跳到源码并选中绑定行范围 |
 | `cim.openDocsIndex` | 主页 / 汇总 |
 | `cim.deleteDoc` | 删除绑定文档（需确认） |
 | `cim.rebindDoc` | 将文档改绑：选源文件 → 整文件或代码块（状态栏确认选区） |
+| `cim.retightenRange` | 按 symbol 重算 range 行号 |
 | `cim.toggleSplitSync` | 开关分栏同步 |
 | `cim.refreshTree` | 刷新树与漂移扫描 |
 | `cim.showDriftIssues` | 查看并处理绑定漂移 |
