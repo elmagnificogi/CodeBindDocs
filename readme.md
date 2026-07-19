@@ -90,7 +90,6 @@ cbd:
 | [产品需求](docs/REQUIREMENTS.md) | 定位、范围、数据模型 |
 | [测试说明](docs/testing.md) | `npm test` |
 | [开发调试](docs/DEVELOPMENT.md) | 编译、F5 / `npm run debug` |
-| [发布上架](docs/PUBLISHING.md) | Marketplace / Open VSX |
 
 ```bash
 npm install

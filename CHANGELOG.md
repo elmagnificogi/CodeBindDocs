@@ -6,7 +6,7 @@
 
 - Marketplace README 增加产品截图
 - 修正 Marketplace 分类（移除无效的 `Documentation`）
-- 完善上架配置：LICENSE、图标、`repository`、打包忽略规则与发布说明
+- 完善上架配置：LICENSE、图标、`repository`、打包忽略规则
 
 ## [0.1.0] - 2026-07-19
 
