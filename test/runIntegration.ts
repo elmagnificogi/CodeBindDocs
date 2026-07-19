@@ -7,7 +7,7 @@ async function main(): Promise<void> {
   const extensionDevelopmentPath = path.resolve(__dirname, '../..');
   const extensionTestsPath = path.resolve(__dirname, './suite/index');
 
-  const tmpWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), 'cim-integ-'));
+  const tmpWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), 'cbd-integ-'));
   fs.mkdirSync(path.join(tmpWorkspace, 'src'), { recursive: true });
   fs.writeFileSync(
     path.join(tmpWorkspace, 'src', 'sample.ts'),

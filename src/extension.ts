@@ -4,8 +4,8 @@ import { DriftChecker, refreshBindingHash } from './drift/driftChecker';
 import { getWorkspaceStore, IndexStore } from './store/indexStore';
 import { Binding, normalizeRelPath } from './store/types';
 import { SplitSync } from './sync/splitSync';
-import { BindingItem, CimTreeProvider } from './views/cimTreeProvider';
-import { CimCodeLensProvider } from './views/cimCodeLens';
+import { BindingItem, CbdTreeProvider } from './views/cbdTreeProvider';
+import { CbdCodeLensProvider } from './views/cbdCodeLens';
 import {
   disposeRangePicker,
   pickLineRangeInEditor,
@@ -17,8 +17,8 @@ import { suggestSymbolInRange } from './util/suggestSymbol';
 
 let splitSync: SplitSync | undefined;
 let driftChecker: DriftChecker | undefined;
-let treeProvider: CimTreeProvider | undefined;
-let codeLensProvider: CimCodeLensProvider | undefined;
+let treeProvider: CbdTreeProvider | undefined;
+let codeLensProvider: CbdCodeLensProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   const getStore = () => getWorkspaceStore();
@@ -34,50 +34,50 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
   driftChecker = new DriftChecker(getStore);
-  treeProvider = new CimTreeProvider(getStore);
-  codeLensProvider = new CimCodeLensProvider(getStore);
+  treeProvider = new CbdTreeProvider(getStore);
+  codeLensProvider = new CbdCodeLensProvider(getStore);
 
   context.subscriptions.push(
     splitSync,
     driftChecker,
-    vscode.window.registerTreeDataProvider('cim.bindings', treeProvider),
+    vscode.window.registerTreeDataProvider('cbd.bindings', treeProvider),
     vscode.languages.registerCodeLensProvider({ scheme: 'file' }, codeLensProvider)
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('cim.initialize', () => initialize(getStore)),
-    vscode.commands.registerCommand('cim.bindCurrentFile', (sourceRel?: string) =>
+    vscode.commands.registerCommand('cbd.initialize', () => initialize(getStore)),
+    vscode.commands.registerCommand('cbd.bindCurrentFile', (sourceRel?: string) =>
       bindCurrentFile(getStore, sourceRel)
     ),
-    vscode.commands.registerCommand('cim.revealBoundDoc', () => revealBoundDoc()),
-    vscode.commands.registerCommand('cim.toggleSplitSync', () => toggleSplitSync()),
-    vscode.commands.registerCommand('cim.refreshTree', () => refreshAll()),
-    vscode.commands.registerCommand('cim.openTarget', (item?: BindingItem) => openTarget(getStore, item)),
+    vscode.commands.registerCommand('cbd.revealBoundDoc', () => revealBoundDoc()),
+    vscode.commands.registerCommand('cbd.toggleSplitSync', () => toggleSplitSync()),
+    vscode.commands.registerCommand('cbd.refreshTree', () => refreshAll()),
+    vscode.commands.registerCommand('cbd.openTarget', (item?: BindingItem) => openTarget(getStore, item)),
     vscode.commands.registerCommand(
-      'cim.revealSourceRange',
+      'cbd.revealSourceRange',
       (arg?: BindingItem | { docRel?: string; sourceRel?: string; startLine?: number; endLine?: number }) =>
         revealSourceRange(getStore, arg)
     ),
-    vscode.commands.registerCommand('cim.openDoc', (item?: BindingItem) => openDoc(getStore, item)),
-    vscode.commands.registerCommand('cim.openDocsIndex', () => openDocsIndex(getStore)),
-    vscode.commands.registerCommand('cim.deleteDoc', (item?: BindingItem | { docRel?: string }) =>
+    vscode.commands.registerCommand('cbd.openDoc', (item?: BindingItem) => openDoc(getStore, item)),
+    vscode.commands.registerCommand('cbd.openDocsIndex', () => openDocsIndex(getStore)),
+    vscode.commands.registerCommand('cbd.deleteDoc', (item?: BindingItem | { docRel?: string }) =>
       deleteDoc(getStore, item)
     ),
-    vscode.commands.registerCommand('cim.rebindDoc', (item?: BindingItem | { docRel?: string }) =>
+    vscode.commands.registerCommand('cbd.rebindDoc', (item?: BindingItem | { docRel?: string }) =>
       rebindDoc(getStore, item)
     ),
     vscode.commands.registerCommand(
-      'cim.retightenRange',
+      'cbd.retightenRange',
       (item?: BindingItem | { docRel?: string }) => retightenRange(item)
     ),
-    vscode.commands.registerCommand('cim.showDriftIssues', () =>
+    vscode.commands.registerCommand('cbd.showDriftIssues', () =>
       driftChecker?.showIssuesPicker()
     ),
     vscode.commands.registerCommand(
-      'cim.refreshDocHash',
+      'cbd.refreshDocHash',
       (item?: BindingItem | { docRel?: string }) => refreshDocHash(getStore, item)
     ),
-    vscode.commands.registerCommand('cim.refreshAllDocHashes', () =>
+    vscode.commands.registerCommand('cbd.refreshAllDocHashes', () =>
       refreshAllDocHashes()
     )
   );
@@ -110,7 +110,7 @@ async function bootstrap(getStore: () => IndexStore | undefined): Promise<void> 
 async function initialize(getStore: () => IndexStore | undefined): Promise<void> {
   const store = getStore();
   if (!store) {
-    void vscode.window.showErrorMessage('CIM: 请先打开一个工作区文件夹。');
+    void vscode.window.showErrorMessage('CBD: 请先打开一个工作区文件夹。');
     return;
   }
 
@@ -124,17 +124,17 @@ async function initialize(getStore: () => IndexStore | undefined): Promise<void>
     try {
       await vscode.workspace.fs.stat(welcomeUri);
     } catch {
-      const text = `# 欢迎使用 CIM
+      const text = `# 欢迎使用 CodeBind Docs
 
-本工作区使用 \`${store.docsPath}/*.md\` 的 YAML 文件头声明绑定（可用设置 \`cim.docsPath\` 修改目录）。
+本工作区使用 \`${store.docsPath}/*.md\` 的 YAML 文件头声明绑定（可用设置 \`cbd.docsPath\` 修改目录）。
 
-用 **CIM: Bind Doc to Current File** 为源文件创建文档；切换源文件即可分栏同步。
+用 **CBD: Bind Doc to Current File** 为源文件创建文档；切换源文件即可分栏同步。
 
 示例文件头：
 
 \`\`\`yaml
 ---
-cim:
+cbd:
   target: src/example.ts
   kind: file
 ---
@@ -152,7 +152,7 @@ cim:
       ? ` 已写入 ${templatesWritten} 个默认模板到 \`${store.templatesPath}/\`。`
       : ` 模板目录：\`${store.templatesPath}/\`。`;
   void vscode.window.showInformationMessage(
-    `CIM: 已初始化文档目录 \`${store.docsPath}/\` 与 Agent 脚手架。${extra}`
+    `CBD: 已初始化文档目录 \`${store.docsPath}/\` 与 Agent 脚手架。${extra}`
   );
 }
 
@@ -162,7 +162,7 @@ async function bindCurrentFile(
 ): Promise<void> {
   const store = getStore();
   if (!store) {
-    void vscode.window.showErrorMessage('CIM: 请先打开一个工作区文件夹。');
+    void vscode.window.showErrorMessage('CBD: 请先打开一个工作区文件夹。');
     return;
   }
 
@@ -179,7 +179,7 @@ async function bindCurrentFile(
     }
   } else {
     if (!editor || editor.document.uri.scheme !== 'file') {
-      void vscode.window.showErrorMessage('CIM: 请先聚焦一个源文件。');
+      void vscode.window.showErrorMessage('CBD: 请先聚焦一个源文件。');
       return;
     }
     sourceUri = editor.document.uri;
@@ -187,11 +187,11 @@ async function bindCurrentFile(
   }
 
   if (!rel || !sourceUri) {
-    void vscode.window.showErrorMessage('CIM: 文件不在工作区内。');
+    void vscode.window.showErrorMessage('CBD: 文件不在工作区内。');
     return;
   }
   if (store.isUnderDocsPath(rel)) {
-    void vscode.window.showErrorMessage(`CIM: 不能绑定文档目录（${store.docsPath}/）内的文件。`);
+    void vscode.window.showErrorMessage(`CBD: 不能绑定文档目录（${store.docsPath}/）内的文件。`);
     return;
   }
 
@@ -207,12 +207,12 @@ async function bindCurrentFile(
     [
       {
         label: '整文件',
-        description: 'cim.kind: file',
+        description: 'cbd.kind: file',
         bindKind: 'file' as const,
       },
       {
         label: '代码块（稍后在编辑器中选区）',
-        description: 'cim.kind: range + startLine/endLine',
+        description: 'cbd.kind: range + startLine/endLine',
         bindKind: 'range' as const,
       },
     ],
@@ -371,7 +371,7 @@ async function bindCurrentFile(
   await splitSync?.openDocUri(store.docUri(binding.doc), true);
   const scope =
     kindPick.bindKind === 'range' ? `L${startLine}-${endLine}` : '整文件';
-  void vscode.window.showInformationMessage(`CIM: 已绑定 ${rel}（${scope}）→ ${binding.doc}`);
+  void vscode.window.showInformationMessage(`CBD: 已绑定 ${rel}（${scope}）→ ${binding.doc}`);
 
   void (async () => {
     try {
@@ -388,13 +388,13 @@ async function bindCurrentFile(
 async function revealBoundDoc(): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
-    void vscode.window.showErrorMessage('CIM: 没有活动编辑器。');
+    void vscode.window.showErrorMessage('CBD: 没有活动编辑器。');
     return;
   }
   const ok = await splitSync?.revealDocForUri(editor.document.uri);
   if (!ok) {
     const choice = await vscode.window.showInformationMessage(
-      'CIM: 该文件无关联文档。',
+      'CBD: 该文件无关联文档。',
       '新建关联文档'
     );
     if (choice === '新建关联文档') {
@@ -406,7 +406,7 @@ async function revealBoundDoc(): Promise<void> {
 function toggleSplitSync(): void {
   const enabled = splitSync?.toggle() ?? false;
   void vscode.window.showInformationMessage(
-    enabled ? 'CIM: 分栏同步已开启' : 'CIM: 分栏同步已关闭'
+    enabled ? 'CBD: 分栏同步已开启' : 'CBD: 分栏同步已关闭'
   );
 }
 
@@ -425,7 +425,7 @@ async function refreshAll(): Promise<void> {
 async function openDocsIndex(getStore: () => IndexStore | undefined): Promise<void> {
   const store = getStore();
   if (!store) {
-    void vscode.window.showErrorMessage('CIM: 请先打开一个工作区文件夹。');
+    void vscode.window.showErrorMessage('CBD: 请先打开一个工作区文件夹。');
     return;
   }
   await store.ensureLayout();
@@ -483,13 +483,13 @@ async function revealSourceRange(
         ? normalizeRelPath(arg.docRel)
         : splitSync?.currentDocRel();
     if (!docRel) {
-      void vscode.window.showWarningMessage('CIM: 请先打开一篇绑定文档。');
+      void vscode.window.showWarningMessage('CBD: 请先打开一篇绑定文档。');
       return;
     }
     const index = await store.read();
     const binding = store.findByDocPath(index, docRel);
     if (!binding) {
-      void vscode.window.showWarningMessage(`CIM: 未找到绑定 ${docRel}`);
+      void vscode.window.showWarningMessage(`CBD: 未找到绑定 ${docRel}`);
       return;
     }
     sourceRel = binding.target.path;
@@ -525,7 +525,7 @@ async function revealSourceRange(
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    void vscode.window.showWarningMessage(`CIM: 无法打开源文件（${msg}）`);
+    void vscode.window.showWarningMessage(`CBD: 无法打开源文件（${msg}）`);
   }
 }
 
@@ -547,7 +547,7 @@ async function deleteDoc(
 ): Promise<void> {
   const store = getStore();
   if (!store) {
-    void vscode.window.showErrorMessage('CIM: 请先打开一个工作区文件夹。');
+    void vscode.window.showErrorMessage('CBD: 请先打开一个工作区文件夹。');
     return;
   }
 
@@ -570,11 +570,11 @@ async function deleteDoc(
       docRel: b.doc,
     }));
     if (!picks.length) {
-      void vscode.window.showInformationMessage('CIM: 没有可删除的绑定文档。');
+      void vscode.window.showInformationMessage('CBD: 没有可删除的绑定文档。');
       return;
     }
     const picked = await vscode.window.showQuickPick(picks, {
-      title: 'CIM: 选择要删除的文档',
+      title: 'CBD: 选择要删除的文档',
       placeHolder: '删除后不可从扩展内恢复（一般进回收站）',
     });
     if (!picked) {
@@ -584,7 +584,7 @@ async function deleteDoc(
   }
 
   if (store.isIndexDoc(docRel)) {
-    void vscode.window.showWarningMessage('CIM: 不能删除自动生成的 cim-index.md。');
+    void vscode.window.showWarningMessage('CBD: 不能删除自动生成的 cbd-index.md。');
     return;
   }
 
@@ -608,7 +608,7 @@ async function deleteDoc(
     await store.deleteDoc(docRel);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    void vscode.window.showErrorMessage(`CIM: ${msg}`);
+    void vscode.window.showErrorMessage(`CBD: ${msg}`);
     return;
   }
 
@@ -630,7 +630,7 @@ async function rebindDoc(
 ): Promise<void> {
   const store = getStore();
   if (!store) {
-    void vscode.window.showErrorMessage('CIM: 请先打开一个工作区文件夹。');
+    void vscode.window.showErrorMessage('CBD: 请先打开一个工作区文件夹。');
     return;
   }
 
@@ -642,19 +642,19 @@ async function rebindDoc(
         : splitSync?.currentDocRel();
 
   if (!docRel) {
-    void vscode.window.showWarningMessage('CIM: 请指定要重新绑定的文档。');
+    void vscode.window.showWarningMessage('CBD: 请指定要重新绑定的文档。');
     return;
   }
 
   if (store.isIndexDoc(docRel)) {
-    void vscode.window.showWarningMessage('CIM: 不能重新绑定 cim-index.md。');
+    void vscode.window.showWarningMessage('CBD: 不能重新绑定 cbd-index.md。');
     return;
   }
 
   const index = await store.read();
   const binding = index.bindings.find((b) => normalizeRelPath(b.doc) === docRel);
   if (!binding) {
-    void vscode.window.showWarningMessage(`CIM: 未找到绑定文档 ${docRel}`);
+    void vscode.window.showWarningMessage(`CBD: 未找到绑定文档 ${docRel}`);
     return;
   }
 
@@ -674,11 +674,11 @@ async function rebindDoc(
 
   const newRel = store.toWorkspaceRelative(picked[0]);
   if (!newRel) {
-    void vscode.window.showErrorMessage('CIM: 请选择工作区内的文件。');
+    void vscode.window.showErrorMessage('CBD: 请选择工作区内的文件。');
     return;
   }
   if (store.isUnderDocsPath(newRel)) {
-    void vscode.window.showErrorMessage('CIM: 不能绑定到文档目录内的文件。');
+    void vscode.window.showErrorMessage('CBD: 不能绑定到文档目录内的文件。');
     return;
   }
 
@@ -686,14 +686,14 @@ async function rebindDoc(
     [
       {
         label: '整文件',
-        description: 'cim.kind: file',
+        description: 'cbd.kind: file',
         bindKind: 'file' as const,
       },
       {
         label: '代码块（稍后在编辑器中选区）',
         description: wasRange
           ? `原为 range L${binding.target.startLine}-${binding.target.endLine}`
-          : 'cim.kind: range + startLine/endLine',
+          : 'cbd.kind: range + startLine/endLine',
         bindKind: 'range' as const,
       },
     ],
@@ -757,7 +757,7 @@ async function rebindDoc(
   const scope =
     kindPick.bindKind === 'range' ? `L${startLine}-${endLine}` : '整文件';
   void vscode.window.showInformationMessage(
-    `CIM: 已将 ${docRel} 重新绑定到 ${newRel}（${scope}）`
+    `CBD: 已将 ${docRel} 重新绑定到 ${newRel}（${scope}）`
   );
 }
 
@@ -770,7 +770,7 @@ async function retightenRange(item?: BindingItem | { docRel?: string }): Promise
         : splitSync?.currentDocRel();
 
   if (!docRel) {
-    void vscode.window.showWarningMessage('CIM: 请指定要重算行号的文档。');
+    void vscode.window.showWarningMessage('CBD: 请指定要重算行号的文档。');
     return;
   }
 
@@ -796,7 +796,7 @@ async function refreshDocHash(
 ): Promise<void> {
   const store = getStore();
   if (!store) {
-    void vscode.window.showErrorMessage('CIM: 请先打开一个工作区文件夹。');
+    void vscode.window.showErrorMessage('CBD: 请先打开一个工作区文件夹。');
     return;
   }
 
@@ -808,14 +808,14 @@ async function refreshDocHash(
         : splitSync?.currentDocRel();
 
   if (!docRel) {
-    void vscode.window.showWarningMessage('CIM: 请指定要刷新哈希的文档。');
+    void vscode.window.showWarningMessage('CBD: 请指定要刷新哈希的文档。');
     return;
   }
 
   const index = await store.read();
   const binding = index.bindings.find((b) => normalizeRelPath(b.doc) === docRel);
   if (!binding) {
-    void vscode.window.showWarningMessage(`CIM: 未找到绑定 ${docRel}`);
+    void vscode.window.showWarningMessage(`CBD: 未找到绑定 ${docRel}`);
     return;
   }
 
@@ -823,7 +823,7 @@ async function refreshDocHash(
     await refreshBindingHash(store, binding);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    void vscode.window.showErrorMessage(`CIM: 刷新哈希失败（${msg}）`);
+    void vscode.window.showErrorMessage(`CBD: 刷新哈希失败（${msg}）`);
     return;
   }
 
@@ -833,7 +833,7 @@ async function refreshDocHash(
   if (splitSync?.isHome()) {
     await splitSync.openHome(false);
   }
-  void vscode.window.showInformationMessage(`CIM: 已更新 ${docRel} 的 contentHash`);
+  void vscode.window.showInformationMessage(`CBD: 已更新 ${docRel} 的 contentHash`);
 }
 
 async function refreshAllDocHashes(): Promise<void> {

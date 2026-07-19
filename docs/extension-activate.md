@@ -1,11 +1,11 @@
 ---
-cim:
+cbd:
   target: src/extension.ts
   kind: range
   startLine: 15
   endLine: 58
   symbol: activate
-  contentHash: a21da3c2434c
+  contentHash: 22fdfb74518a
 ---
 # activate（代码块）
 

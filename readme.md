@@ -1,14 +1,16 @@
-# CIM — Code Integrated Manual
+# CodeBind Docs（CBD）
 
 **旁路绑定的代码文档扩展**（VS Code / Cursor）：源码零侵入，文档落在仓库 Markdown 里，打开代码时左右分栏同步查看与编辑。适合人与 AI Agent 共用同一套设计上下文。
+
+命令与设置前缀为 **`cbd`**（CodeBind Docs 简称）。
 
 > 详细步骤见 [使用说明](docs/USER_GUIDE.md) · 产品需求见 [REQUIREMENTS](docs/REQUIREMENTS.md)
 
 ---
 
-## 为什么用 CIM
+## 为什么用 CodeBind Docs
 
-| 痛点 | CIM 做法 |
+| 痛点 | CodeBind Docs 做法 |
 |------|----------|
 | 文档散落、和代码对不上 | 绑定写在文档 YAML 头，跟文件/行范围走 |
 | 注释污染源码 | **不改源码**，旁路 Markdown |
@@ -24,7 +26,7 @@
 - **即时渲染**：Vditor 类 Typora 编辑；可切纯文本源码；可选大纲 TOC
 - **主页与侧栏**：绑定目录树、覆盖率、待绑定列表、漂移提醒
 - **漂移治理**：改名（含目录）自动改路径；哈希软提醒；按 symbol 一键重算行号
-- **资源与嵌入**：粘贴图片进 `assets/`；`cim-include` 只读嵌入本仓库其它文档
+- **资源与嵌入**：粘贴图片进 `assets/`；`cbd-include` 只读嵌入本仓库其它文档
 - **Agent 友好**：Initialize 写入对照表与规则，改代码前可读绑定文档
 
 ---
@@ -32,16 +34,16 @@
 ## 快速开始
 
 1. 安装本扩展后，打开任意工作区文件夹  
-2. 命令面板运行 **`CIM: Initialize`**（创建 `docs/`、`AGENTS.md` 等）  
-3. 打开一个源文件，运行 **`CIM: Bind Doc to Current File`**（整文件或代码块）  
-4. 之后切换源文件即可左右分栏；左侧 Activity Bar 有 **CIM** 图标  
+2. 命令面板运行 **`CBD: Initialize`**（创建 `docs/`、`AGENTS.md` 等）  
+3. 打开一个源文件，运行 **`CBD: Bind Doc to Current File`**（整文件或代码块）  
+4. 之后切换源文件即可左右分栏；左侧 Activity Bar 有 **CodeBind Docs** 图标  
 
 常用入口：
 
 | 入口 | 作用 |
 |------|------|
-| 命令 `CIM: Open Docs Index` | 文档主页 |
-| 源码顶部 CodeLens / 状态栏 `CIM 文档` | 打开旁路文档 |
+| 命令 `CBD: Open Docs Index` | 文档主页 |
+| 源码顶部 CodeLens / 状态栏 `CodeBind Docs 文档` | 打开旁路文档 |
 | 侧栏 **已绑定 / 待绑定** | 浏览与补绑 |
 
 完整流程、设置项、命令表见 **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**。
@@ -50,11 +52,11 @@
 
 ## 绑定长什么样
 
-文档目录默认 `docs/`（可用设置 `cim.docsPath` 修改）。绑定写在 Markdown **文件头**：
+文档目录默认 `docs/`（可用设置 `cbd.docsPath` 修改）。绑定写在 Markdown **文件头**：
 
 ```yaml
 ---
-cim:
+cbd:
   target: src/foo.ts
   kind: file          # 或 range
   startLine: 15       # range 时
@@ -65,7 +67,7 @@ cim:
 ```
 
 - **不修改**被绑定的源码文件  
-- 无 `cim:` 头的 Markdown 不算绑定（例如本仓库的 `REQUIREMENTS.md`）  
+- 无 `cbd:` 头的 Markdown 不算绑定（例如本仓库的 `REQUIREMENTS.md`）  
 
 ---
 

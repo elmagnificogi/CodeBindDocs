@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run CIM in VS Code",
+      "name": "Run CodeBind Docs in VS Code",
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${env:LOCALAPPDATA}\\Programs\\Microsoft VS Code\\Code.exe",
@@ -16,7 +16,7 @@
       "debugWebWorkerExtensions": false
     },
     {
-      "name": "Run CIM in VS Code (empty window)",
+      "name": "Run CodeBind Docs in VS Code (empty window)",
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${env:LOCALAPPDATA}\\Programs\\Microsoft VS Code\\Code.exe",
@@ -29,7 +29,7 @@
       "debugWebWorkerExtensions": false
     },
     {
-      "name": "Run CIM in Cursor (fallback)",
+      "name": "Run CodeBind Docs in Cursor (fallback)",
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",

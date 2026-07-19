@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { IndexStore } from '../store/indexStore';
-import { CimIndex, normalizeRelPath } from '../store/types';
+import { CbdIndex, normalizeRelPath } from '../store/types';
 
 const SKIP_PREFIXES = [
   'node_modules/',
@@ -42,10 +42,10 @@ export type CoverageReport = {
   total: number;
 };
 
-/** Scan workspace for bindable sources missing a CIM binding. */
+/** Scan workspace for bindable sources missing a CodeBind Docs binding. */
 export async function scanBindingCoverage(
   store: IndexStore,
-  index: CimIndex
+  index: CbdIndex
 ): Promise<CoverageReport> {
   const bound = new Set(
     index.bindings.map((b) => normalizeRelPath(b.target.path)).filter(Boolean)

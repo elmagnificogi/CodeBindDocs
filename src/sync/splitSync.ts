@@ -24,12 +24,12 @@ export class SplitSync {
     refreshDrift: () => Promise<void> = async () => undefined
   ) {
     this.pane = new MarkdownPane(extensionUri, getStore, getDriftIssues, refreshDrift);
-    const cfg = vscode.workspace.getConfiguration('cim');
+    const cfg = vscode.workspace.getConfiguration('cbd');
     this.enabled = cfg.get<boolean>('splitSync.enabled', true);
 
     this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
-    this.statusBar.command = 'cim.revealBoundDoc';
-    this.statusBar.tooltip = '打开当前文件的 CIM 旁路文档';
+    this.statusBar.command = 'cbd.revealBoundDoc';
+    this.statusBar.tooltip = '打开当前文件的 CodeBind Docs 旁路文档';
 
     this.disposables.push(
       this.pane,
@@ -49,9 +49,9 @@ export class SplitSync {
         }, 120);
       }),
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration('cim.splitSync.enabled')) {
+        if (e.affectsConfiguration('cbd.splitSync.enabled')) {
           this.enabled = vscode.workspace
-            .getConfiguration('cim')
+            .getConfiguration('cbd')
             .get<boolean>('splitSync.enabled', true);
         }
       })
@@ -78,7 +78,7 @@ export class SplitSync {
   setEnabled(value: boolean): void {
     this.enabled = value;
     void vscode.workspace
-      .getConfiguration('cim')
+      .getConfiguration('cbd')
       .update('splitSync.enabled', value, vscode.ConfigurationTarget.Workspace);
   }
 
@@ -245,7 +245,7 @@ export class SplitSync {
       return;
     }
     this.statusBar.text =
-      bindingCount > 1 ? `$(book) CIM (${bindingCount})` : '$(book) CIM 文档';
+      bindingCount > 1 ? `$(book) CBD (${bindingCount})` : '$(book) CBD 文档';
     this.statusBar.show();
   }
 
@@ -263,13 +263,13 @@ export class SplitSync {
   }
 
   private resolveColumn(): vscode.ViewColumn {
-    // Keep the CIM pane in its current group — Beside/Two on reveal resizes splits.
+    // Keep the CodeBind Docs pane in its current group — Beside/Two on reveal resizes splits.
     const existing = this.pane.viewColumn;
     if (existing != null) {
       return existing;
     }
     const mode = vscode.workspace
-      .getConfiguration('cim')
+      .getConfiguration('cbd')
       .get<string>('splitSync.viewColumn', 'Beside');
     if (mode === 'Two') {
       return vscode.ViewColumn.Two;
@@ -292,7 +292,7 @@ export class SplitSync {
       await this.pane.show(docUri, this.resolveColumn(), forceFocus);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      void vscode.window.showWarningMessage(`CIM: 无法打开绑定文档（${msg}）`);
+      void vscode.window.showWarningMessage(`CBD: 无法打开绑定文档（${msg}）`);
     } finally {
       this.syncing = false;
     }
@@ -304,7 +304,7 @@ function shouldOfferBind(rel: string, store: IndexStore): boolean {
     return false;
   }
   const prompt = vscode.workspace
-    .getConfiguration('cim')
+    .getConfiguration('cbd')
     .get<boolean>('splitSync.promptWhenUnbound', true);
   return prompt;
 }

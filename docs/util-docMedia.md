@@ -1,5 +1,5 @@
 ---
-cim:
+cbd:
   target: src/util/docMedia.ts
   kind: file
   symbol: rewriteImagesForWebview

@@ -38,10 +38,10 @@ export class DriftChecker {
   private suspendSaveHandling = 0;
 
   constructor(private readonly getStore: () => IndexStore | undefined) {
-    this.diagnosticCollection = vscode.languages.createDiagnosticCollection('cim');
+    this.diagnosticCollection = vscode.languages.createDiagnosticCollection('cbd');
     this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
-    this.statusBar.command = 'cim.showDriftIssues';
-    this.statusBar.tooltip = 'CIM 绑定漂移 — 点击查看';
+    this.statusBar.command = 'cbd.showDriftIssues';
+    this.statusBar.tooltip = 'CodeBind Docs 绑定漂移 — 点击查看';
     this.statusBar.show();
 
     this.disposables.push(
@@ -50,7 +50,7 @@ export class DriftChecker {
       vscode.workspace.onDidRenameFiles((e) => void this.onRename(e)),
       vscode.workspace.onDidSaveTextDocument((doc) => void this.onSave(doc)),
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration('cim.docsPath') || e.affectsConfiguration('cim.assetsPath')) {
+        if (e.affectsConfiguration('cbd.docsPath') || e.affectsConfiguration('cbd.assetsPath')) {
           this.getStore()?.invalidateCache();
           void this.scanAll({ notify: false });
         }
@@ -165,7 +165,7 @@ export class DriftChecker {
   async showIssuesPicker(): Promise<void> {
     await this.scanAll({ notify: false });
     if (!this.issues.length) {
-      void vscode.window.showInformationMessage('CIM: 当前没有绑定漂移。');
+      void vscode.window.showInformationMessage('CBD: 当前没有绑定漂移。');
       return;
     }
 
@@ -196,7 +196,7 @@ export class DriftChecker {
     }
 
     const picked = await vscode.window.showQuickPick(items, {
-      title: 'CIM 绑定变更提示',
+      title: 'CodeBind Docs 绑定变更提示',
       placeHolder: '选择一项进行处理',
     });
     if (!picked) {
@@ -220,7 +220,7 @@ export class DriftChecker {
     await this.scanAll({ notify: false });
     const hashIssues = this.issues.filter((i) => i.kind === 'hash');
     if (!hashIssues.length) {
-      void vscode.window.showInformationMessage('CIM: 当前没有待核对的源码变更提醒。');
+      void vscode.window.showInformationMessage('CBD: 当前没有待核对的源码变更提醒。');
       return 0;
     }
     const index = await store.read();
@@ -240,7 +240,7 @@ export class DriftChecker {
     }
     await store.writeDocsIndex();
     await this.scanAll({ notify: false });
-    void vscode.window.showInformationMessage(`CIM: 已标记 ${n} 个文档为已核对`);
+    void vscode.window.showInformationMessage(`CBD: 已标记 ${n} 个文档为已核对`);
     return n;
   }
 
@@ -256,16 +256,16 @@ export class DriftChecker {
     const index = await store.read();
     const binding = index.bindings.find((b) => normalizeRelPath(b.doc) === normalizeRelPath(docRel));
     if (!binding) {
-      void vscode.window.showWarningMessage(`CIM: 未找到绑定 ${docRel}`);
+      void vscode.window.showWarningMessage(`CBD: 未找到绑定 ${docRel}`);
       return undefined;
     }
     const symbol = binding.anchors?.[0]?.symbol?.trim();
     if (!symbol) {
-      void vscode.window.showWarningMessage('CIM: 该绑定没有 symbol，无法按符号重算行号。');
+      void vscode.window.showWarningMessage('CBD: 该绑定没有 symbol，无法按符号重算行号。');
       return undefined;
     }
     if (binding.target.kind !== 'range') {
-      void vscode.window.showWarningMessage('CIM: 仅代码块（range）绑定支持按 symbol 重算。');
+      void vscode.window.showWarningMessage('CBD: 仅代码块（range）绑定支持按 symbol 重算。');
       return undefined;
     }
 
@@ -282,11 +282,11 @@ export class DriftChecker {
       span = await resolveSymbolLineRange(targetUri, symbol, previousSpan);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      void vscode.window.showErrorMessage(`CIM: 重算行号失败（${msg}）`);
+      void vscode.window.showErrorMessage(`CBD: 重算行号失败（${msg}）`);
       return undefined;
     }
     if (!span) {
-      void vscode.window.showWarningMessage(`CIM: 未找到符号「${symbol}」，请改绑或手改行号。`);
+      void vscode.window.showWarningMessage(`CBD: 未找到符号「${symbol}」，请改绑或手改行号。`);
       return undefined;
     }
 
@@ -296,7 +296,7 @@ export class DriftChecker {
         : '原范围';
     if (span.startLine === prevStart && span.endLine === prevEnd) {
       void vscode.window.showInformationMessage(
-        `CIM: ${docRel} 行号已是最新（${oldLabel} · ${symbol}）`
+        `CBD: ${docRel} 行号已是最新（${oldLabel} · ${symbol}）`
       );
       await refreshBindingHash(store, binding);
       await this.scanAll({ notify: false });
@@ -312,7 +312,7 @@ export class DriftChecker {
     this.notifiedKeys.clear();
     await this.scanAll({ notify: false });
     void vscode.window.showInformationMessage(
-      `CIM: 已按「${symbol}」重算 ${docRel}：${oldLabel} → L${span.startLine}-${span.endLine}`
+      `CBD: 已按「${symbol}」重算 ${docRel}：${oldLabel} → L${span.startLine}-${span.endLine}`
     );
     return span;
   }
@@ -421,14 +421,14 @@ export class DriftChecker {
 
     if (updated.length) {
       const choice = await vscode.window.showInformationMessage(
-        `CIM: 已根据改名更新绑定路径（共 ${bindingHits} 条）：\n${updated
+        `CBD: 已根据改名更新绑定路径（共 ${bindingHits} 条）：\n${updated
           .slice(0, 3)
           .join('\n')}${updated.length > 3 ? `\n…共 ${updated.length} 个改名项` : ''}`,
         '打开文档主页',
         '查看漂移'
       );
       if (choice === '打开文档主页') {
-        await vscode.commands.executeCommand('cim.openDocsIndex');
+        await vscode.commands.executeCommand('cbd.openDocsIndex');
       } else if (choice === '查看漂移') {
         await this.showIssuesPicker();
       }
@@ -511,7 +511,7 @@ export class DriftChecker {
         actions.splice(2, 0, '全部标记已核对');
       }
       const pick = await vscode.window.showInformationMessage(
-        `CIM 提醒（可忽略）\n${issue.message}\n文档：${issue.doc}`,
+        `CodeBind Docs 提醒（可忽略）\n${issue.message}\n文档：${issue.doc}`,
         ...actions
       );
       if (!pick || pick === '知道了') {
@@ -532,12 +532,12 @@ export class DriftChecker {
           await refreshBindingHash(store, binding);
           this.notifiedKeys.delete(issueKey(issue));
           await this.scanAll({ notify: false });
-          void vscode.window.showInformationMessage(`CIM: 已清除 ${issue.doc} 的源码变更提醒`);
+          void vscode.window.showInformationMessage(`CBD: 已清除 ${issue.doc} 的源码变更提醒`);
         }
         return;
       }
       if (pick === '打开文档核对') {
-        await vscode.commands.executeCommand('cim.openDoc', {
+        await vscode.commands.executeCommand('cbd.openDoc', {
           binding: {
             doc: issue.doc,
             id: issue.doc,
@@ -575,10 +575,10 @@ export class DriftChecker {
 
     const title =
       issue.kind === 'range' || issue.kind === 'symbol'
-        ? `CIM：建议按 symbol 重算行号`
+        ? `CodeBind Docs：建议按 symbol 重算行号`
         : issue.kind === 'overlap'
-          ? `CIM 绑定关系可能已变更`
-          : `CIM 绑定异常`;
+          ? `CodeBind Docs 绑定关系可能已变更`
+          : `CodeBind Docs 绑定异常`;
 
     const pick = await vscode.window.showWarningMessage(
       `${title}\n${issue.message}\n文档：${issue.doc}`,
@@ -594,14 +594,14 @@ export class DriftChecker {
     }
     if (pick === '重新绑定') {
       if (issue.kind === 'missing-doc') {
-        await vscode.commands.executeCommand('cim.bindCurrentFile', issue.targetPath);
+        await vscode.commands.executeCommand('cbd.bindCurrentFile', issue.targetPath);
       } else {
-        await vscode.commands.executeCommand('cim.rebindDoc', { docRel: issue.doc });
+        await vscode.commands.executeCommand('cbd.rebindDoc', { docRel: issue.doc });
       }
       return;
     }
     if (pick === '打开文档') {
-      await vscode.commands.executeCommand('cim.openDoc', {
+      await vscode.commands.executeCommand('cbd.openDoc', {
         binding: { doc: issue.doc, id: issue.doc, target: { path: issue.targetPath, kind: 'file' } },
       });
       return;
@@ -616,12 +616,12 @@ export class DriftChecker {
         const textDoc = await vscode.workspace.openTextDocument(uri);
         await vscode.window.showTextDocument(textDoc, { viewColumn: vscode.ViewColumn.One });
       } catch {
-        void vscode.window.showWarningMessage(`CIM: 无法打开 ${issue.targetPath}`);
+        void vscode.window.showWarningMessage(`CBD: 无法打开 ${issue.targetPath}`);
       }
       return;
     }
     if (pick === '删除文档') {
-      await vscode.commands.executeCommand('cim.deleteDoc', { docRel: issue.doc });
+      await vscode.commands.executeCommand('cbd.deleteDoc', { docRel: issue.doc });
     }
   }
 
@@ -639,10 +639,10 @@ export class DriftChecker {
           : vscode.DiagnosticSeverity.Information;
       const diag = new vscode.Diagnostic(
         new vscode.Range(0, 0, 0, 1),
-        `CIM: ${issue.message}`,
+        `CBD: ${issue.message}`,
         severity
       );
-      diag.source = 'CIM';
+      diag.source = 'CodeBind Docs';
       const list = byPath.get(uri.toString()) ?? [];
       list.push(diag);
       byPath.set(uri.toString(), list);
@@ -656,15 +656,15 @@ export class DriftChecker {
     const warnings = this.issues.filter((i) => i.severity === 'warning').length;
     const infos = this.issues.filter((i) => i.severity === 'info').length;
     if (warnings === 0 && infos === 0) {
-      this.statusBar.text = '$(book) CIM';
+      this.statusBar.text = '$(book) CBD';
       this.statusBar.backgroundColor = undefined;
-      this.statusBar.tooltip = 'CIM 绑定漂移 — 点击查看';
+      this.statusBar.tooltip = 'CodeBind Docs 绑定漂移 — 点击查看';
     } else if (warnings > 0) {
-      this.statusBar.text = `$(warning) CIM 绑定 ${warnings}`;
+      this.statusBar.text = `$(warning) CodeBind Docs 绑定 ${warnings}`;
       this.statusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
-      this.statusBar.tooltip = 'CIM 绑定异常 — 点击处理';
+      this.statusBar.tooltip = 'CodeBind Docs 绑定异常 — 点击处理';
     } else {
-      this.statusBar.text = `$(info) CIM 核对 ${infos}`;
+      this.statusBar.text = `$(info) CodeBind Docs 核对 ${infos}`;
       this.statusBar.backgroundColor = undefined;
       this.statusBar.tooltip = '源码变更提醒（可忽略）— 点击查看';
     }

@@ -1,5 +1,5 @@
 ---
-cim:
+cbd:
   target: src/webview/mdProtect.ts
   kind: file
   contentHash: ba4140faed3e

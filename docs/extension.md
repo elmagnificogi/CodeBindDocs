@@ -1,9 +1,9 @@
 ---
-cim:
+cbd:
   target: src/extension.ts
   kind: file
   symbol: activate
-  contentHash: cd8e3f2975ca
+  contentHash: 22fdfb74518a
 ---
 # extension.ts
 

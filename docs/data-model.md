@@ -1,28 +1,28 @@
 ---
-cim:
+cbd:
   target: src/store/indexStore.ts
   kind: file
   symbol: IndexStore
-  contentHash: ceb8e4e20025
+  contentHash: ca44fdab03da
 ---
 # indexStore.ts / 数据模型
 
 ## 目录布局
 
 ```text
-docs/                 # 默认文档目录（cim.docsPath）
-  *.md                # 带 cim: 文件头的绑定文档
-  cim-index.md        # 自动生成的汇总
-  assets/             # 可选媒体（cim.assetsPath 可覆盖；粘贴图片自动落入）
-  _templates/         # 新建文档模板（cim.templatesPath 可覆盖）
-docs/REQUIREMENTS.md  # 普通文档（无 cim: 头，不算绑定）
+docs/                 # 默认文档目录（cbd.docsPath）
+  *.md                # 带 cbd: 文件头的绑定文档
+  cbd-index.md        # 自动生成的汇总
+  assets/             # 可选媒体（cbd.assetsPath 可覆盖；粘贴图片自动落入）
+  _templates/         # 新建文档模板（cbd.templatesPath 可覆盖）
+docs/REQUIREMENTS.md  # 普通文档（无 cbd: 头，不算绑定）
 ```
 
 ## 配置
 
-- `cim.docsPath`：文档根目录，默认 `docs`
-- `cim.assetsPath`：资源目录，空则 `{docsPath}/assets`
-- `cim.templatesPath`：新建文档模板目录，空则 `{docsPath}/_templates`
+- `cbd.docsPath`：文档根目录，默认 `docs`
+- `cbd.assetsPath`：资源目录，空则 `{docsPath}/assets`
+- `cbd.templatesPath`：新建文档模板目录，空则 `{docsPath}/_templates`
 
 ## 改名
 
@@ -35,7 +35,7 @@ docs/REQUIREMENTS.md  # 普通文档（无 cim: 头，不算绑定）
 ### 整文件
 
 ```yaml
-cim:
+cbd:
   target: src/foo.ts
   kind: file
   contentHash: abc
@@ -44,7 +44,7 @@ cim:
 ### 代码块（行范围）
 
 ```yaml
-cim:
+cbd:
   target: src/foo.ts
   kind: range
   startLine: 15
@@ -58,11 +58,11 @@ cim:
 ## IndexStore 职责
 
 - 扫描/缓存绑定；`writeBinding` / `deleteDoc` / `createDocIfMissing`
-- 改名更新 `cim.target`；生成 `cim-index.md`
+- 改名更新 `cbd.target`；生成 `cbd-index.md`
 - `resolveBindingForLine` 供分栏与 CodeLens
 
 ## 约束
 
 - 绝不修改被绑定的源码文件
-- 无 `cim:` 文件头的 Markdown 不算绑定
-- 不能删除自动生成的 `cim-index.md`
+- 无 `cbd:` 文件头的 Markdown 不算绑定
+- 不能删除自动生成的 `cbd-index.md`

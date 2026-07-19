@@ -1,23 +1,23 @@
 ---
-cim:
+cbd:
   target: src/webview/markdownPane.ts
   kind: file
   symbol: MarkdownPane
-  contentHash: d3b48d70abd8
+  contentHash: d68dbb78d719
 ---
 # markdownPane.ts
 
 ## 概述
 
-CIM 右侧文档面板：Vditor IR / 源码、主页、覆盖率、图片 assets、**文档嵌入**。
+CodeBind Docs 右侧文档面板：Vditor IR / 源码、主页、覆盖率、图片 assets、**文档嵌入**。
 
 ## 职责
 
 - IR / 源码切换；YAML 头隐藏
-- 主页：目录树 + 覆盖率 + 绑定提醒 + 核对提醒
+- 主页：目录树 + 覆盖率摘要 + 绑定提醒 + 核对提醒；未绑定列表为独立导航页
 - 图片：`saveAsset` → assets；相对路径落盘，webview URI 预览
 - **嵌入**：加载时 `expandDocIncludes`，保存时 `collapseDocIncludes`
-- 大纲：`cim.docPane.outline`
+- 大纲：`cbd.docPane.outline`
 
 ## 性能
 
@@ -25,4 +25,4 @@ CIM 右侧文档面板：Vditor IR / 源码、主页、覆盖率、图片 assets
 
 ## 约束
 
-- 不修改被绑定源码；不删 `cim-index.md`
+- 不修改被绑定源码；不删 `cbd-index.md`

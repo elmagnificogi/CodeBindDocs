@@ -1,23 +1,23 @@
 ---
-cim:
+cbd:
   target: src/agent/scaffold.ts
   kind: file
   symbol: scaffoldAgentFiles
-  contentHash: 62d4b94b42c4
+  contentHash: 2be3b6ea2174
 ---
 # scaffold.ts
 
 ## 概述
 
-`CIM: Initialize` 时写入 Agent 脚手架（若不存在则创建）：
+`CBD: Initialize` 时写入 Agent 脚手架（若不存在则创建）：
 
 - 根目录 `AGENTS.md`
-- `.cursor/rules/cim.mdc`
+- `.cursor/rules/cbd.mdc`
 
 ## 行为
 
 - `writeIfMissing`：已有文件不覆盖，避免冲掉人工修改
-- 内容说明文档目录、`cim-index.md`、文件头绑定与 Agent 阅读规则
+- 内容说明文档目录、`cbd-index.md`、文件头绑定与 Agent 阅读规则
 
 ## 约束
 

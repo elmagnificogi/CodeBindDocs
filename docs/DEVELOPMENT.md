@@ -1,4 +1,4 @@
-# CIM 开发与调试
+# CodeBind Docs 开发与调试
 
 面向扩展贡献者。最终用户请看 [USER_GUIDE.md](USER_GUIDE.md)。
 
@@ -12,7 +12,7 @@ media/               扩展图标等（Vditor 资源由 compile 复制）
 AGENTS.md            Agent 入口
 ```
 
-本仓库用自身 `docs/` 做 dogfood，绑定见 `docs/cim-index.md`（自动生成，勿手改）。
+本仓库用自身 `docs/` 做 dogfood，绑定见 `docs/cbd-index.md`（自动生成，勿手改）。
 
 ## 安装依赖与编译
 
@@ -44,7 +44,7 @@ npm run debug:watch
 
 会编译并用 `--extensionDevelopmentPath` 启动 VS Code。窗口标题一般含 **`[Extension Development Host]`**。
 
-也可运行任务 **CIM: Debug (compile + VS Code)**。
+也可运行任务 **CBD: Debug (compile + VS Code)**。
 
 从 Cursor 按 F5 时，调试器仍挂在 Cursor 上，点工作区文件夹常会抢回 Cursor；请优先用 `npm run debug`。
 

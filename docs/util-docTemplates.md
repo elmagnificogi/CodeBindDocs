@@ -1,8 +1,8 @@
 ---
-cim:
+cbd:
   target: src/util/docTemplates.ts
   kind: file
-  contentHash: 5ec4040b23e8
+  contentHash: 839158b38e3c
 ---
 # docTemplates.ts
 
@@ -12,8 +12,8 @@ cim:
 
 ## 配置
 
-- 设置项 **`cim.templatesPath`**：工作区相对路径；留空 = `{docsPath}/_templates`（默认 `docs/_templates`）
-- `CIM: Initialize` 或首次绑定时，若目录为空会写入默认 `design.md` / `api.md` / `minimal.md`
+- 设置项 **`cbd.templatesPath`**：工作区相对路径；留空 = `{docsPath}/_templates`（默认 `docs/_templates`）
+- `CBD: Initialize` 或首次绑定时，若目录为空会写入默认 `design.md` / `api.md` / `minimal.md`
 
 ## 模板文件格式
 
@@ -28,7 +28,7 @@ description: 概述 · 约束 …
 …
 ```
 
-- 可选头字段：`label`、`description`（**不要**写 `cim:`，否则可能被当成绑定）
+- 可选头字段：`label`、`description`（**不要**写 `cbd:`，否则可能被当成绑定）
 - 正文用 `{{title}}` 占位；目录下有任意 `.md` 时只用磁盘模板
 
 ## 约束

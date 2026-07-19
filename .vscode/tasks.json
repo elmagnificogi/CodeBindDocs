@@ -22,7 +22,7 @@
       "script": "test:unit",
       "group": "test",
       "problemMatcher": [],
-      "label": "CIM: Test Unit",
+      "label": "CBD: Test Unit",
       "presentation": {
         "reveal": "always",
         "panel": "shared"
@@ -36,14 +36,14 @@
         "isDefault": true
       },
       "problemMatcher": [],
-      "label": "CIM: Test All",
+      "label": "CBD: Test All",
       "presentation": {
         "reveal": "always",
         "panel": "shared"
       }
     },
     {
-      "label": "CIM: Debug (compile + VS Code)",
+      "label": "CBD: Debug (compile + VS Code)",
       "type": "npm",
       "script": "debug",
       "problemMatcher": [],
@@ -53,7 +53,7 @@
       }
     },
     {
-      "label": "CIM: Debug Watch (compile + watch + VS Code)",
+      "label": "CBD: Debug Watch (compile + watch + VS Code)",
       "type": "npm",
       "script": "debug:watch",
       "isBackground": true,

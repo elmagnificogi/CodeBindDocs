@@ -1,8 +1,8 @@
 ---
-cim:
+cbd:
   target: src/util/rangePicker.ts
   kind: file
-  contentHash: 75f223b03f9d
+  contentHash: ff2a7a93169b
 ---
 # rangePicker.ts
 
@@ -14,7 +14,7 @@ cim:
 
 - `pickLineRangeInEditor`：打开文件、可选预选旧 range、显示状态栏「确认 / 取消」
 - 用户可自由拖选；点确认后读取当前选区的 1-based 行范围
-- `registerRangePickerCommands`：注册 `cim.acceptRangeSelection` / `cim.cancelRangeSelection`
+- `registerRangePickerCommands`：注册 `cbd.acceptRangeSelection` / `cbd.cancelRangeSelection`
 
 ## 约束
 

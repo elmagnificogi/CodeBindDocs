@@ -5,9 +5,9 @@ import * as vscode from 'vscode';
 import { IndexStore } from '../../src/store/indexStore';
 import { refreshBindingHash } from '../../src/drift/driftChecker';
 
-suite('CIM integration smoke', () => {
+suite('CodeBind Docs integration smoke', () => {
   test('initialize creates docs layout and AGENTS.md', async () => {
-    await vscode.commands.executeCommand('cim.initialize');
+    await vscode.commands.executeCommand('cbd.initialize');
     const folder = vscode.workspace.workspaceFolders?.[0];
     assert.ok(folder, 'workspace folder required');
     const docs = path.join(folder.uri.fsPath, 'docs');
@@ -26,7 +26,7 @@ suite('CIM integration smoke', () => {
     const docUri = store.docUri(docRel);
     const body = `# sample\n\noverview\n`;
     const md = `---
-cim:
+cbd:
   target: src/foo/sample.ts
   kind: file
   symbol: hello

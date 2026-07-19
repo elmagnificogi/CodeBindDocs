@@ -1,4 +1,4 @@
-# CIM debug launcher: compile (optional watch) then start VS Code Extension Development Host.
+# CodeBind Docs debug launcher: compile (optional watch) then start VS Code Extension Development Host.
 # Usage:
 #   powershell -File scripts/debug.ps1
 #   powershell -File scripts/debug.ps1 -Watch
@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 
 $repo = Split-Path -Parent $PSScriptRoot
 if (-not (Test-Path (Join-Path $repo "package.json"))) {
-  Write-Error "Cannot find package.json. Run from CIM repo."
+  Write-Error "Cannot find package.json. Run from CodeBind Docs repo."
 }
 
 if (-not $CodePath) {
@@ -26,7 +26,7 @@ if (-not (Test-Path $CodePath)) {
 }
 
 Write-Host ""
-Write-Host "=== CIM Debug ===" -ForegroundColor Cyan
+Write-Host "=== CodeBind Docs Debug ===" -ForegroundColor Cyan
 Write-Host "repo: $repo"
 Write-Host "code: $CodePath"
 
@@ -59,8 +59,8 @@ try {
   Pop-Location
 }
 
-$userData = Join-Path $env:TEMP "cim-vscode-dev-user-data"
-$extDir = Join-Path $env:TEMP "cim-vscode-dev-extensions"
+$userData = Join-Path $env:TEMP "cbd-vscode-dev-user-data"
+$extDir = Join-Path $env:TEMP "cbd-vscode-dev-extensions"
 New-Item -ItemType Directory -Force -Path $userData | Out-Null
 New-Item -ItemType Directory -Force -Path $extDir | Out-Null
 
@@ -76,7 +76,7 @@ Start-Process -FilePath $CodePath -ArgumentList @(
   $repo
 )
 
-Write-Host "Done. VS Code should open with CIM loaded." -ForegroundColor Green
+Write-Host "Done. VS Code should open with CodeBind Docs loaded." -ForegroundColor Green
 Write-Host ""
 
 if ($Watch -and $watchJob) {

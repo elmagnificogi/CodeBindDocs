@@ -33,7 +33,7 @@ suite('docEmbed', () => {
 
   test('collapseDocIncludes restores compact fence', () => {
     const view = [
-      '```cim-include-view',
+      '```cbd-include-view',
       'doc: docs/foo.md',
       'heading: 概述',
       '',
@@ -44,8 +44,8 @@ suite('docEmbed', () => {
       '```',
     ].join('\n');
     const collapsed = collapseDocIncludes(view);
-    assert.ok(collapsed.includes('```cim-include'));
-    assert.ok(!collapsed.includes('cim-include-view'));
+    assert.ok(collapsed.includes('```cbd-include'));
+    assert.ok(!collapsed.includes('cbd-include-view'));
     assert.ok(collapsed.includes('doc: docs/foo.md'));
     assert.ok(collapsed.includes('heading: 概述'));
     assert.ok(!collapsed.includes('> body'));

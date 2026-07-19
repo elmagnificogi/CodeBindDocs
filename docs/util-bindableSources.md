@@ -1,15 +1,15 @@
 ---
-cim:
+cbd:
   target: src/util/bindableSources.ts
   kind: file
   symbol: scanBindingCoverage
-  contentHash: 872d0d212e14
+  contentHash: 1732aa5d4f9d
 ---
 # bindableSources.ts
 
 ## 概述
 
-判定「哪些源文件适合绑定」，并扫描**绑定覆盖率**（已绑定 / 未绑定列表），供主页展示。
+判定「哪些源文件适合绑定」，并扫描**绑定覆盖率**（已绑定 / 未绑定列表），供主页摘要与未绑定独立页展示。
 
 ## 规则
 
@@ -19,4 +19,4 @@ cim:
 
 ## 约束
 
-- 覆盖率列表在主页截断展示（主机侧限制条数），避免超大仓库卡死 UI
+- 未绑定列表在独立页截断展示（主机侧限制条数），避免超大仓库卡死 UI

@@ -3,7 +3,7 @@ import { IndexStore } from '../store/indexStore';
 import { Binding, normalizeRelPath } from '../store/types';
 import { scanBindingCoverage } from '../util/bindableSources';
 
-export type CimTreeItem =
+export type CbdTreeItem =
   | IndexPageItem
   | SectionItem
   | BindingItem
@@ -13,13 +13,13 @@ export type CimTreeItem =
 
 export class IndexPageItem extends vscode.TreeItem {
   constructor(docsPath: string) {
-    super('文档汇总 (cim-index)', vscode.TreeItemCollapsibleState.None);
+    super('文档汇总 (cbd-index)', vscode.TreeItemCollapsibleState.None);
     this.contextValue = 'index';
-    this.description = `${docsPath}/cim-index.md`;
+    this.description = `${docsPath}/cbd-index.md`;
     this.tooltip = '查看全部绑定文档的目录页';
     this.iconPath = new vscode.ThemeIcon('book');
     this.command = {
-      command: 'cim.openDocsIndex',
+      command: 'cbd.openDocsIndex',
       title: 'Open Docs Index',
     };
   }
@@ -66,7 +66,7 @@ export class BindingItem extends vscode.TreeItem {
       binding.target.kind === 'range' ? 'symbol-method' : 'link'
     );
     this.command = {
-      command: 'cim.openTarget',
+      command: 'cbd.openTarget',
       title: 'Open Source',
       arguments: [this],
     };
@@ -80,7 +80,7 @@ export class UnboundSourceItem extends vscode.TreeItem {
     this.tooltip = `尚未绑定 · ${sourceRel}`;
     this.iconPath = new vscode.ThemeIcon('file-code');
     this.command = {
-      command: 'cim.bindCurrentFile',
+      command: 'cbd.bindCurrentFile',
       title: 'Bind',
       arguments: [sourceRel],
     };
@@ -94,7 +94,7 @@ export class UnboundMoreItem extends vscode.TreeItem {
     this.tooltip = '完整列表见文档主页「绑定覆盖率」';
     this.iconPath = new vscode.ThemeIcon('ellipsis');
     this.command = {
-      command: 'cim.openDocsIndex',
+      command: 'cbd.openDocsIndex',
       title: 'Open Docs Index',
     };
   }
@@ -110,8 +110,8 @@ export class UnboundEmptyItem extends vscode.TreeItem {
 
 const UNBOUND_TREE_LIMIT = 40;
 
-export class CimTreeProvider implements vscode.TreeDataProvider<CimTreeItem> {
-  private readonly _onDidChangeTreeData = new vscode.EventEmitter<CimTreeItem | undefined | void>();
+export class CbdTreeProvider implements vscode.TreeDataProvider<CbdTreeItem> {
+  private readonly _onDidChangeTreeData = new vscode.EventEmitter<CbdTreeItem | undefined | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private boundCache: BindingItem[] = [];
@@ -123,11 +123,11 @@ export class CimTreeProvider implements vscode.TreeDataProvider<CimTreeItem> {
     this._onDidChangeTreeData.fire();
   }
 
-  getTreeItem(element: CimTreeItem): vscode.TreeItem {
+  getTreeItem(element: CbdTreeItem): vscode.TreeItem {
     return element;
   }
 
-  async getChildren(element?: CimTreeItem): Promise<CimTreeItem[]> {
+  async getChildren(element?: CbdTreeItem): Promise<CbdTreeItem[]> {
     const store = this.getStore();
     if (!store || !(await store.exists())) {
       return [];
@@ -159,7 +159,7 @@ export class CimTreeProvider implements vscode.TreeDataProvider<CimTreeItem> {
         return this.boundCache;
       }
       const slice = this.unboundCache.slice(0, UNBOUND_TREE_LIMIT);
-      const items: CimTreeItem[] = slice.map((p) => new UnboundSourceItem(p));
+      const items: CbdTreeItem[] = slice.map((p) => new UnboundSourceItem(p));
       if (this.unboundCache.length > UNBOUND_TREE_LIMIT) {
         items.push(new UnboundMoreItem(this.unboundCache.length - UNBOUND_TREE_LIMIT));
       }

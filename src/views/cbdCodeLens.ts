@@ -3,10 +3,10 @@ import { IndexStore } from '../store/indexStore';
 
 /**
  * CodeLens on bound source files:
- * - file-level: top-of-file「打开 CIM 文档」
+ * - file-level: top-of-file「打开 CodeBind Docs 文档」
  * - range: at startLine with symbol / line label
  */
-export class CimCodeLensProvider implements vscode.CodeLensProvider {
+export class CbdCodeLensProvider implements vscode.CodeLensProvider {
   private readonly _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChangeCodeLenses = this._onDidChange.event;
 
@@ -51,8 +51,8 @@ export class CimCodeLensProvider implements vscode.CodeLensProvider {
         bindings.length > 1 ? `（${bindings.length} 篇）` : '';
       lenses.push(
         new vscode.CodeLens(top, {
-          title: `CIM: 打开文档${extra}`,
-          command: 'cim.revealBoundDoc',
+          title: `CBD: 打开文档${extra}`,
+          command: 'cbd.revealBoundDoc',
           arguments: [],
         })
       );
@@ -63,12 +63,12 @@ export class CimCodeLensProvider implements vscode.CodeLensProvider {
       const range = new vscode.Range(line, 0, line, 0);
       const symbol = b.anchors?.[0]?.symbol;
       const label = symbol
-        ? `CIM: ${symbol} (${b.target.startLine}-${b.target.endLine})`
-        : `CIM 代码块文档 L${b.target.startLine}-${b.target.endLine}`;
+        ? `CBD: ${symbol} (${b.target.startLine}-${b.target.endLine})`
+        : `CodeBind Docs 代码块文档 L${b.target.startLine}-${b.target.endLine}`;
       lenses.push(
         new vscode.CodeLens(range, {
           title: label,
-          command: 'cim.openDoc',
+          command: 'cbd.openDoc',
           arguments: [{ binding: b }],
         })
       );

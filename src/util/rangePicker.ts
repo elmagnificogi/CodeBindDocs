@@ -48,18 +48,18 @@ export async function pickLineRangeInEditor(
     vscode.StatusBarAlignment.Left,
     1000
   );
-  statusConfirm.text = '$(check) CIM: 确认代码块选区';
+  statusConfirm.text = '$(check) CBD: 确认代码块选区';
   statusConfirm.tooltip = '在编辑器中选好代码后点击确认（可自由选区，不会弹出阻挡对话框）';
   statusConfirm.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
-  statusConfirm.command = 'cim.acceptRangeSelection';
+  statusConfirm.command = 'cbd.acceptRangeSelection';
   statusConfirm.show();
 
   const statusCancel = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
     999
   );
-  statusCancel.text = '$(close) CIM: 取消';
-  statusCancel.command = 'cim.cancelRangeSelection';
+  statusCancel.text = '$(close) CBD: 取消';
+  statusCancel.command = 'cbd.cancelRangeSelection';
   statusCancel.show();
 
   void vscode.window.showInformationMessage(
@@ -81,21 +81,21 @@ export function registerRangePickerCommands(
   context: vscode.ExtensionContext
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('cim.acceptRangeSelection', () => {
+    vscode.commands.registerCommand('cbd.acceptRangeSelection', () => {
       if (!pending) {
         return;
       }
       const active = vscode.window.activeTextEditor;
       if (!active || active.document.uri.fsPath !== pending.sourceFsPath) {
         void vscode.window.showWarningMessage(
-          'CIM: 请先聚焦目标源文件，并选中要绑定的代码后再确认。'
+          'CBD: 请先聚焦目标源文件，并选中要绑定的代码后再确认。'
         );
         return;
       }
       const range = selectionToLineRange(active.selection);
       finishPending(range);
     }),
-    vscode.commands.registerCommand('cim.cancelRangeSelection', () => {
+    vscode.commands.registerCommand('cbd.cancelRangeSelection', () => {
       finishPending(undefined);
     })
   );

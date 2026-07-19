@@ -1,5 +1,5 @@
 ---
-cim:
+cbd:
   target: src/util/symbolRange.ts
   kind: file
   contentHash: bc8d8af888b8
@@ -19,4 +19,4 @@ cim:
 ## 约束
 
 - 不修改源码
-- 符号名需与绑定 `cim.symbol` 一致
+- 符号名需与绑定 `cbd.symbol` 一致

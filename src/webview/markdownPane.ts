@@ -47,7 +47,7 @@ type HostToWeb =
       mode: DocMode;
       docRel: string;
       deletable: boolean;
-      /** When set, show「定位源码」and jump to this range/file. */
+      /** When set, show「Code」and jump to this range/file. */
       sourceJump?: SourceJump;
       canBack: boolean;
       canForward: boolean;
@@ -66,12 +66,20 @@ type HostToWeb =
       missing: MissingItem[];
       /** Soft reminders: source changed, check if docs need sync (not mandatory). */
       hints: MissingItem[];
-      /** Binding coverage for bindable sources (shown on home). */
+      /** Coverage summary only — full unbound list is on the coverage page. */
       coverage?: {
         boundCount: number;
         total: number;
-        unbound: string[];
+        unboundCount: number;
       };
+      canBack: boolean;
+      canForward: boolean;
+    }
+  | {
+      type: 'coverage';
+      boundCount: number;
+      total: number;
+      unbound: string[];
       canBack: boolean;
       canForward: boolean;
     }
@@ -92,6 +100,7 @@ type WebToHost =
   | { type: 'switchMode'; mode: DocMode; markdown?: string }
   | { type: 'createBind'; sourceRel: string }
   | { type: 'navHome' }
+  | { type: 'navCoverage' }
   | { type: 'navBack' }
   | { type: 'navForward' }
   | { type: 'openDoc'; docRel: string }
@@ -112,6 +121,7 @@ type WebToHost =
 
 type NavEntry =
   | { kind: 'home' }
+  | { kind: 'coverage' }
   | { kind: 'doc'; docRel: string }
   | { kind: 'unbound'; sourceRel: string };
 
@@ -124,6 +134,7 @@ export class MarkdownPane {
   private unboundSourceRel: string | undefined;
   private unboundCanCreate = true;
   private viewingHome = false;
+  private viewingCoverage = false;
   private header: string | undefined;
   private writing = false;
   private saveTimer: NodeJS.Timeout | undefined;
@@ -145,7 +156,7 @@ export class MarkdownPane {
 
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration('cim.docPane.mode')) {
+        if (e.affectsConfiguration('cbd.docPane.mode')) {
           this.mode = this.readModeSetting();
         }
       }),
@@ -162,7 +173,7 @@ export class MarkdownPane {
 
   private readModeSetting(): DocMode {
     const raw = vscode.workspace
-      .getConfiguration('cim')
+      .getConfiguration('cbd')
       .get<string>('docPane.mode', 'ir');
     if (raw === 'source' || raw === 'sv') {
       return 'source';
@@ -213,7 +224,7 @@ export class MarkdownPane {
     }
   }
 
-  /** Current editor group of the CIM pane, if already open. */
+  /** Current editor group of the CodeBind Docs pane, if already open. */
   get viewColumn(): vscode.ViewColumn | undefined {
     return this.panel?.viewColumn;
   }
@@ -235,6 +246,7 @@ export class MarkdownPane {
       this.panel &&
       this.currentUri?.fsPath === docUri.fsPath &&
       !this.viewingHome &&
+      !this.viewingCoverage &&
       !this.unboundSourceRel
     ) {
       if (forceFocus) {
@@ -245,6 +257,7 @@ export class MarkdownPane {
 
     this.unboundSourceRel = undefined;
     this.viewingHome = false;
+    this.viewingCoverage = false;
     this.currentUri = docUri;
     await this.ensurePanel(col, !forceFocus);
 
@@ -269,7 +282,8 @@ export class MarkdownPane {
       this.unboundSourceRel === sourceRel &&
       this.panel &&
       !this.currentUri &&
-      !this.viewingHome
+      !this.viewingHome &&
+      !this.viewingCoverage
     ) {
       if (forceFocus) {
         this.panel.reveal(col, false);
@@ -280,6 +294,7 @@ export class MarkdownPane {
     this.currentUri = undefined;
     this.header = undefined;
     this.viewingHome = false;
+    this.viewingCoverage = false;
     this.unboundSourceRel = sourceRel;
     this.unboundCanCreate = canCreate;
     await this.ensurePanel(col, !forceFocus);
@@ -288,7 +303,7 @@ export class MarkdownPane {
       this.pushHistory({ kind: 'unbound', sourceRel });
     }
 
-    this.panel!.title = 'CIM · 无关联文档';
+    this.panel!.title = 'CBD · 无关联文档';
     await this.panel!.webview.postMessage({
       type: 'unbound',
       sourceRel,
@@ -305,6 +320,7 @@ export class MarkdownPane {
     this.currentUri = undefined;
     this.header = undefined;
     this.unboundSourceRel = undefined;
+    this.viewingCoverage = false;
     this.viewingHome = true;
     const col = this.stayColumn(column);
     await this.ensurePanel(col, !forceFocus);
@@ -315,6 +331,26 @@ export class MarkdownPane {
 
     await this.refreshDrift();
     await this.postHome();
+    if (forceFocus) {
+      this.panel?.reveal(this.stayColumn(col), false);
+    }
+  }
+
+  async showCoverage(column: vscode.ViewColumn, forceFocus = true): Promise<void> {
+    await this.flushPendingSave();
+    this.currentUri = undefined;
+    this.header = undefined;
+    this.unboundSourceRel = undefined;
+    this.viewingHome = false;
+    this.viewingCoverage = true;
+    const col = this.stayColumn(column);
+    await this.ensurePanel(col, !forceFocus);
+
+    if (!this.navigatingHistory) {
+      this.pushHistory({ kind: 'coverage' });
+    }
+
+    await this.postCoverage();
     if (forceFocus) {
       this.panel?.reveal(this.stayColumn(col), false);
     }
@@ -343,6 +379,8 @@ export class MarkdownPane {
       const column = this.panel?.viewColumn ?? vscode.ViewColumn.Beside;
       if (entry.kind === 'home') {
         await this.showHome(column, false);
+      } else if (entry.kind === 'coverage') {
+        await this.showCoverage(column, false);
       } else if (entry.kind === 'doc') {
         const store = this.getStore();
         if (!store) {
@@ -359,9 +397,11 @@ export class MarkdownPane {
   }
 
   private async postNavOnly(): Promise<void> {
-    // reload current view payload already includes flags; for home/unbound we re-send
+    // reload current view payload already includes flags; for home/coverage/unbound we re-send
     if (this.viewingHome) {
       await this.postHome();
+    } else if (this.viewingCoverage) {
+      await this.postCoverage();
     } else if (this.unboundSourceRel && !this.currentUri) {
       await this.panel?.webview.postMessage({
         type: 'unbound',
@@ -381,7 +421,7 @@ export class MarkdownPane {
     const hints: MissingItem[] = [];
     let docsPath = 'docs';
     let coverage:
-      | { boundCount: number; total: number; unbound: string[] }
+      | { boundCount: number; total: number; unboundCount: number }
       | undefined;
     if (store) {
       docsPath = store.docsPath;
@@ -401,7 +441,7 @@ export class MarkdownPane {
         docs.unshift({
           doc: store.indexDocPath,
           target: '(汇总)',
-          title: 'cim-index.md',
+          title: 'cbd-index.md',
           kind: 'index',
         });
         try {
@@ -409,7 +449,7 @@ export class MarkdownPane {
           coverage = {
             boundCount: report.boundCount,
             total: report.total,
-            unbound: report.unbound.slice(0, 80),
+            unboundCount: report.unbound.length,
           };
         } catch {
           // coverage is optional on home
@@ -444,7 +484,7 @@ export class MarkdownPane {
       });
     }
 
-    this.panel!.title = 'CIM · 主页';
+    this.panel!.title = 'CBD · 主页';
     await this.panel!.webview.postMessage({
       type: 'home',
       docsPath,
@@ -452,6 +492,33 @@ export class MarkdownPane {
       missing,
       hints,
       coverage,
+      ...this.navFlags(),
+    } satisfies HostToWeb);
+  }
+
+  private async postCoverage(): Promise<void> {
+    const store = this.getStore();
+    let boundCount = 0;
+    let total = 0;
+    let unbound: string[] = [];
+    if (store && (await store.exists())) {
+      try {
+        const index = await store.read();
+        const report = await scanBindingCoverage(store, index);
+        boundCount = report.boundCount;
+        total = report.total;
+        unbound = report.unbound.slice(0, 500);
+      } catch {
+        // leave empty
+      }
+    }
+
+    this.panel!.title = 'CBD · 未绑定';
+    await this.panel!.webview.postMessage({
+      type: 'coverage',
+      boundCount,
+      total,
+      unbound,
       ...this.navFlags(),
     } satisfies HostToWeb);
   }
@@ -478,8 +545,8 @@ export class MarkdownPane {
     }
 
     this.panel = vscode.window.createWebviewPanel(
-      'cim.markdownPane',
-      'CIM Doc',
+      'cbd.markdownPane',
+      'CBD',
       { viewColumn: column, preserveFocus },
       {
         enableScripts: true,
@@ -497,6 +564,8 @@ export class MarkdownPane {
       if (msg.type === 'ready') {
         if (this.viewingHome) {
           await this.postHome();
+        } else if (this.viewingCoverage) {
+          await this.postCoverage();
         } else if (this.unboundSourceRel && !this.currentUri) {
           await this.panel?.webview.postMessage({
             type: 'unbound',
@@ -510,12 +579,17 @@ export class MarkdownPane {
         return;
       }
       if (msg.type === 'createBind') {
-        await vscode.commands.executeCommand('cim.bindCurrentFile', msg.sourceRel);
+        await vscode.commands.executeCommand('cbd.bindCurrentFile', msg.sourceRel);
         return;
       }
       if (msg.type === 'navHome') {
         await this.flushPendingSave();
         await this.showHome(this.panel?.viewColumn ?? vscode.ViewColumn.Beside, true);
+        return;
+      }
+      if (msg.type === 'navCoverage') {
+        await this.flushPendingSave();
+        await this.showCoverage(this.panel?.viewColumn ?? vscode.ViewColumn.Beside, true);
         return;
       }
       if (msg.type === 'navBack') {
@@ -547,35 +621,35 @@ export class MarkdownPane {
         return;
       }
       if (msg.type === 'deleteDoc') {
-        await vscode.commands.executeCommand('cim.deleteDoc', {
+        await vscode.commands.executeCommand('cbd.deleteDoc', {
           docRel: msg.docRel,
         });
         return;
       }
       if (msg.type === 'rebindDoc') {
-        await vscode.commands.executeCommand('cim.rebindDoc', {
+        await vscode.commands.executeCommand('cbd.rebindDoc', {
           docRel: msg.docRel,
         });
         return;
       }
       if (msg.type === 'retightenRange') {
-        await vscode.commands.executeCommand('cim.retightenRange', {
+        await vscode.commands.executeCommand('cbd.retightenRange', {
           docRel: msg.docRel,
         });
         return;
       }
       if (msg.type === 'refreshHash') {
-        await vscode.commands.executeCommand('cim.refreshDocHash', {
+        await vscode.commands.executeCommand('cbd.refreshDocHash', {
           docRel: msg.docRel,
         });
         return;
       }
       if (msg.type === 'refreshAllHashes') {
-        await vscode.commands.executeCommand('cim.refreshAllDocHashes');
+        await vscode.commands.executeCommand('cbd.refreshAllDocHashes');
         return;
       }
       if (msg.type === 'openTarget') {
-        await vscode.commands.executeCommand('cim.revealSourceRange', {
+        await vscode.commands.executeCommand('cbd.revealSourceRange', {
           sourceRel: msg.sourceRel,
           startLine: msg.startLine,
           endLine: msg.endLine,
@@ -593,7 +667,7 @@ export class MarkdownPane {
         }
         this.mode = msg.mode;
         void vscode.workspace
-          .getConfiguration('cim')
+          .getConfiguration('cbd')
           .update('docPane.mode', msg.mode, vscode.ConfigurationTarget.Workspace);
         return;
       }
@@ -607,6 +681,7 @@ export class MarkdownPane {
       this.currentUri = undefined;
       this.unboundSourceRel = undefined;
       this.viewingHome = false;
+      this.viewingCoverage = false;
       this.header = undefined;
       this.history = [];
       this.historyIndex = -1;
@@ -631,8 +706,8 @@ export class MarkdownPane {
       const text = Buffer.from(raw).toString('utf8');
       const { header, body } = splitMarkdown(text);
       this.header = header;
-      const title = this.currentUri.path.split('/').pop() ?? 'CIM Doc';
-      this.panel.title = `CIM · ${title}`;
+      const title = this.currentUri.path.split('/').pop() ?? 'CBD';
+      this.panel.title = `CBD · ${title}`;
       const deletable = Boolean(
         store && docRel && store.isUnderDocsPath(docRel) && !store.isIndexDoc(docRel)
       );
@@ -684,7 +759,7 @@ export class MarkdownPane {
       await this.panel.webview.postMessage(payload);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      void vscode.window.showWarningMessage(`CIM: 无法加载文档（${msg}）`);
+      void vscode.window.showWarningMessage(`CBD: 无法加载文档（${msg}）`);
     }
   }
 
@@ -783,7 +858,7 @@ export class MarkdownPane {
       await vscode.workspace.fs.writeFile(this.currentUri, Buffer.from(content, 'utf8'));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      void vscode.window.showWarningMessage(`CIM: 保存文档失败（${msg}）`);
+      void vscode.window.showWarningMessage(`CBD: 保存文档失败（${msg}）`);
     } finally {
       this.writing = false;
     }
@@ -836,7 +911,7 @@ export class MarkdownPane {
       )
     );
     const outlineEnable = vscode.workspace
-      .getConfiguration('cim')
+      .getConfiguration('cbd')
       .get<boolean>('docPane.outline', true);
 
     const csp = [
@@ -930,11 +1005,11 @@ export class MarkdownPane {
       content: none !important;
       display: none !important;
     }
-    #unbound, #home {
+    #unbound, #home, #coveragePage {
       display: none; height: calc(100% - 34px); overflow: auto;
       padding: 24px 28px 40px;
     }
-    #unbound.visible, #home.visible { display: block; }
+    #unbound.visible, #home.visible, #coveragePage.visible { display: block; }
     #unbound.center {
       display: none; height: calc(100% - 34px);
       align-items: center; justify-content: center;
@@ -958,9 +1033,9 @@ export class MarkdownPane {
     #homeBar.hidden, #editorBar.hidden { display: none; }
     #homeBar { display: none; }
     #homeBar.visible { display: flex; }
-    #unbound h2, #home h2 { margin: 0 0 8px; font-weight: 600; font-size: 16px; }
-    #unbound p, #home p { margin: 0 0 16px; opacity: 0.75; font-size: 13px; line-height: 1.5; }
-    #unbound code, #home code {
+    #unbound h2, #home h2, #coveragePage h2 { margin: 0 0 8px; font-weight: 600; font-size: 16px; }
+    #unbound p, #home p, #coveragePage p { margin: 0 0 16px; opacity: 0.75; font-size: 13px; line-height: 1.5; }
+    #unbound code, #home code, #coveragePage code {
       font-family: var(--vscode-editor-font-family);
       background: rgba(127,127,127,0.15); padding: 1px 6px; border-radius: 3px;
     }
@@ -1050,7 +1125,9 @@ export class MarkdownPane {
     #missingSection h2 { color: var(--vscode-errorForeground, #f14c4c); }
     #hintSection h2 { font-weight: 600; opacity: 0.9; }
     #coverageSection .cov-stat { margin: 0 0 10px; font-size: 13px; }
-    #coverageSection .cov-list code { font-size: 12px; }
+    #coverageSection .cov-actions { margin: 0 0 4px; }
+    #coveragePage .cov-stat { margin: 0 0 16px; font-size: 13px; }
+    #coveragePage .cov-list code { font-size: 12px; }
   </style>
 </head>
 <body>
@@ -1061,9 +1138,9 @@ export class MarkdownPane {
     <span class="sep"></span>
     <span id="editorBar">
       <button type="button" id="btnIr" class="active">即时渲染</button>
-      <button type="button" id="btnSource">源码</button>
+      <button type="button" id="btnSource">文档源码</button>
       <span class="sep"></span>
-      <button type="button" id="btnRevealSource" class="hidden-mode" title="在左侧打开并选中绑定的源码范围">定位源码</button>
+      <button type="button" id="btnRevealSource" class="hidden-mode" title="在左侧打开并选中绑定的代码范围">Code</button>
       <button type="button" id="btnDelete" class="danger hidden-mode" title="删除此文档">删除</button>
     </span>
     <span class="hint" id="hint">输入 Markdown 即时渲染 · YAML 头已隐藏</span>
@@ -1071,7 +1148,7 @@ export class MarkdownPane {
   <div id="editorRoot">
     <div id="wrap">
       <div id="vditorIr"></div>
-      <textarea id="mdSource" class="hidden-mode" spellcheck="false" aria-label="Markdown 源码"></textarea>
+      <textarea id="mdSource" class="hidden-mode" spellcheck="false" aria-label="文档源码"></textarea>
     </div>
   </div>
   <div id="home">
@@ -1080,7 +1157,9 @@ export class MarkdownPane {
     <div id="coverageSection" class="hidden-mode">
       <h2>绑定覆盖率</h2>
       <p id="coverageStat" class="cov-stat"></p>
-      <ul class="doc-list cov-list" id="coverageList"></ul>
+      <p id="coverageActions" class="cov-actions hidden-mode">
+        <button type="button" id="btnOpenCoverage" class="cta">查看未绑定</button>
+      </p>
     </div>
     <div id="missingSection" class="hidden-mode">
       <h2>绑定提醒</h2>
@@ -1096,12 +1175,17 @@ export class MarkdownPane {
       <ul class="doc-list" id="hintList"></ul>
     </div>
     <h2 id="boundHeading">已绑定文档</h2>
-    <p style="margin-top:-8px">按源文件目录树排列 · 点文件夹折叠 · 点源文件名打开源码 · 点文档打开旁路文档</p>
+    <p style="margin-top:-8px">按源文件目录树排列 · 点文件夹折叠 · 点源文件名打开 Code · 点文档打开旁路文档</p>
     <ul class="bound-tree" id="docList"></ul>
+  </div>
+  <div id="coveragePage">
+    <h2>未绑定源文件</h2>
+    <p id="coveragePageStat" class="cov-stat"></p>
+    <ul class="doc-list cov-list" id="coveragePageList"></ul>
   </div>
   <div id="unbound" class="center">
     <h2>无关联文档</h2>
-    <p>当前文件 <code id="unboundPath"></code> 尚未绑定 CIM 文档。</p>
+    <p>当前文件 <code id="unboundPath"></code> 尚未绑定 CodeBind Docs 文档。</p>
     <button type="button" class="cta primary" id="btnCreate">新建关联文档</button>
   </div>
   <script src="${vditorJs}"></script>
@@ -1117,6 +1201,7 @@ export class MarkdownPane {
     const editorRoot = document.getElementById('editorRoot');
     const editorBar = document.getElementById('editorBar');
     const homeEl = document.getElementById('home');
+    const coveragePageEl = document.getElementById('coveragePage');
     const unboundEl = document.getElementById('unbound');
     const unboundPath = document.getElementById('unboundPath');
     const btnCreate = document.getElementById('btnCreate');
@@ -1127,7 +1212,10 @@ export class MarkdownPane {
     const hintList = document.getElementById('hintList');
     const coverageSection = document.getElementById('coverageSection');
     const coverageStat = document.getElementById('coverageStat');
-    const coverageList = document.getElementById('coverageList');
+    const coverageActions = document.getElementById('coverageActions');
+    const btnOpenCoverage = document.getElementById('btnOpenCoverage');
+    const coveragePageStat = document.getElementById('coveragePageStat');
+    const coveragePageList = document.getElementById('coveragePageList');
     const hashBulkRow = document.getElementById('hashBulkRow');
     const btnRefreshAllHashes = document.getElementById('btnRefreshAllHashes');
     const outlineEnable = ${outlineEnable ? 'true' : 'false'};
@@ -1210,11 +1298,11 @@ export class MarkdownPane {
       btnRevealSource.classList.toggle('hidden-mode', !show);
       if (show && jump.kind === 'range' && jump.startLine != null) {
         btnRevealSource.title =
-          '定位源码 L' + jump.startLine + (jump.endLine != null ? '-' + jump.endLine : '');
-        btnRevealSource.textContent = '定位源码';
+          '打开绑定代码 L' + jump.startLine + (jump.endLine != null ? '-' + jump.endLine : '');
+        btnRevealSource.textContent = 'Code';
       } else if (show) {
         btnRevealSource.title = '打开绑定的源文件';
-        btnRevealSource.textContent = '打开源码';
+        btnRevealSource.textContent = 'Code';
       }
     }
 
@@ -1238,6 +1326,7 @@ export class MarkdownPane {
     function hideAll() {
       unboundEl.classList.remove('visible');
       homeEl.classList.remove('visible');
+      coveragePageEl.classList.remove('visible');
       parkEditor();
     }
 
@@ -1303,52 +1392,26 @@ export class MarkdownPane {
       docList.innerHTML = '';
       missingList.innerHTML = '';
       hintList.innerHTML = '';
-      coverageList.innerHTML = '';
 
       if (coverage && coverage.total > 0) {
         coverageSection.classList.remove('hidden-mode');
         const pct = coverage.total
           ? Math.round((coverage.boundCount / coverage.total) * 100)
           : 0;
+        const unboundCount = coverage.unboundCount || 0;
         coverageStat.textContent =
           '已绑定 ' + coverage.boundCount + ' / ' + coverage.total
           + ' 个源文件（' + pct + '%）';
-        const unbound = coverage.unbound || [];
-        if (!unbound.length) {
-          const li = document.createElement('li');
-          li.textContent = '全部可绑定源文件均已覆盖。';
-          coverageList.appendChild(li);
+        if (unboundCount > 0) {
+          coverageActions.classList.remove('hidden-mode');
+          btnOpenCoverage.textContent = '查看未绑定（' + unboundCount + '）';
         } else {
-          unbound.forEach(function (path) {
-            const li = document.createElement('li');
-            const card = document.createElement('div');
-            card.className = 'hint-card';
-            const title = document.createElement('code');
-            title.textContent = path;
-            const actions = document.createElement('div');
-            actions.className = 'actions';
-            appendBtn(actions, '新建绑定', null, function () {
-              vscodeApi.postMessage({ type: 'createBind', sourceRel: path });
-            });
-            appendBtn(actions, '打开源文件', 'secondary', function () {
-              vscodeApi.postMessage({ type: 'openTarget', sourceRel: path });
-            });
-            card.appendChild(title);
-            card.appendChild(actions);
-            li.appendChild(card);
-            coverageList.appendChild(li);
-          });
-          if (coverage.boundCount + unbound.length < coverage.total) {
-            const more = document.createElement('li');
-            more.style.opacity = '0.7';
-            more.style.fontSize = '12px';
-            more.textContent = '列表已截断，共 '
-              + (coverage.total - coverage.boundCount) + ' 个未绑定。';
-            coverageList.appendChild(more);
-          }
+          coverageActions.classList.add('hidden-mode');
+          coverageStat.textContent += ' · 全部可绑定源文件均已覆盖';
         }
       } else {
         coverageSection.classList.add('hidden-mode');
+        coverageActions.classList.add('hidden-mode');
       }
 
       const missingItems = missing || [];
@@ -1391,7 +1454,7 @@ export class MarkdownPane {
             appendBtn(actions, '打开文档', null, function () {
               vscodeApi.postMessage({ type: 'openDoc', docRel: item.doc });
             });
-            appendBtn(actions, '定位源码', 'secondary', function () {
+            appendBtn(actions, 'Code', 'secondary', function () {
               vscodeApi.postMessage({ type: 'openTarget', sourceRel: item.target });
             });
             appendBtn(actions, '重新绑定', 'secondary', function () {
@@ -1483,6 +1546,60 @@ export class MarkdownPane {
       } else {
         hint.textContent = '主页 · 选择文档打开';
       }
+      setNav(canBack, canForward);
+      scheduleWarmIr(false);
+    }
+
+    function showCoveragePage(boundCount, total, unbound, canBack, canForward) {
+      hideAll();
+      currentDocRel = '';
+      setDeleteVisible(false);
+      setRevealSourceVisible(null);
+      coveragePageList.innerHTML = '';
+      const list = unbound || [];
+      const unboundTotal = Math.max(0, (total || 0) - (boundCount || 0));
+      const pct = total ? Math.round((boundCount / total) * 100) : 0;
+      coveragePageStat.textContent =
+        '已绑定 ' + boundCount + ' / ' + total + '（' + pct + '%） · 未绑定 '
+        + unboundTotal + ' 个';
+
+      if (!list.length) {
+        const li = document.createElement('li');
+        li.textContent = unboundTotal === 0
+          ? '全部可绑定源文件均已覆盖。'
+          : '暂无未绑定项。';
+        coveragePageList.appendChild(li);
+      } else {
+        list.forEach(function (path) {
+          const li = document.createElement('li');
+          const card = document.createElement('div');
+          card.className = 'hint-card';
+          const title = document.createElement('code');
+          title.textContent = path;
+          const actions = document.createElement('div');
+          actions.className = 'actions';
+          appendBtn(actions, '新建绑定', null, function () {
+            vscodeApi.postMessage({ type: 'createBind', sourceRel: path });
+          });
+          appendBtn(actions, '打开源文件', 'secondary', function () {
+            vscodeApi.postMessage({ type: 'openTarget', sourceRel: path });
+          });
+          card.appendChild(title);
+          card.appendChild(actions);
+          li.appendChild(card);
+          coveragePageList.appendChild(li);
+        });
+        if (list.length < unboundTotal) {
+          const more = document.createElement('li');
+          more.style.opacity = '0.7';
+          more.style.fontSize = '12px';
+          more.textContent = '列表已截断，共 ' + unboundTotal + ' 个未绑定。';
+          coveragePageList.appendChild(more);
+        }
+      }
+
+      coveragePageEl.classList.add('visible');
+      hint.textContent = '未绑定源文件 · 可新建绑定或打开 Code';
       setNav(canBack, canForward);
       scheduleWarmIr(false);
     }
@@ -1663,7 +1780,7 @@ export class MarkdownPane {
 
     function updateHint() {
       hint.textContent = mode === 'source'
-        ? 'Markdown 源码 · YAML 头已隐藏 · 可直接编辑'
+        ? '文档源码 · YAML 头已隐藏 · 可直接编辑'
         : '输入 Markdown 即时渲染 · YAML 头已隐藏';
     }
 
@@ -1909,6 +2026,9 @@ export class MarkdownPane {
     btnHome.addEventListener('click', function () {
       vscodeApi.postMessage({ type: 'navHome' });
     });
+    btnOpenCoverage.addEventListener('click', function () {
+      vscodeApi.postMessage({ type: 'navCoverage' });
+    });
     btnBack.addEventListener('click', function () {
       vscodeApi.postMessage({ type: 'navBack' });
     });
@@ -1948,6 +2068,16 @@ export class MarkdownPane {
         );
         return;
       }
+      if (msg.type === 'coverage') {
+        showCoveragePage(
+          msg.boundCount || 0,
+          msg.total || 0,
+          msg.unbound || [],
+          msg.canBack,
+          msg.canForward
+        );
+        return;
+      }
       if (msg.type !== 'load') return;
       applyMarkdown(
         msg.markdown || '',
@@ -1972,6 +2102,9 @@ function sameNav(a: NavEntry, b: NavEntry): boolean {
     return false;
   }
   if (a.kind === 'home' && b.kind === 'home') {
+    return true;
+  }
+  if (a.kind === 'coverage' && b.kind === 'coverage') {
     return true;
   }
   if (a.kind === 'doc' && b.kind === 'doc') {

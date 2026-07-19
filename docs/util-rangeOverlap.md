@@ -1,5 +1,5 @@
 ---
-cim:
+cbd:
   target: src/util/rangeOverlap.ts
   kind: file
   contentHash: ec109071ebb6

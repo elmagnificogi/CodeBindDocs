@@ -3,7 +3,7 @@ import { protectHrInFences, unprotectHrInFences } from '../../src/webview/mdProt
 
 suite('mdProtect', () => {
   test('protects bare --- inside fences and restores', () => {
-    const md = ['# T', '', '```yaml', '---', 'cim:', '  target: x', '---', '```', '', 'done'].join(
+    const md = ['# T', '', '```yaml', '---', 'cbd:', '  target: x', '---', '```', '', 'done'].join(
       '\n'
     );
     const protectedMd = protectHrInFences(md);

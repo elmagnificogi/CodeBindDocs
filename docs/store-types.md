@@ -1,14 +1,14 @@
 ---
-cim:
+cbd:
   target: src/store/types.ts
   kind: file
-  contentHash: 23538fc0bf0d
+  contentHash: 6b645e7c2ed6
 ---
 # types.ts
 
 ## 概述
 
-CIM 核心类型：`Binding`、`BindingTarget`、`BindingAnchor`、`CimIndex`。
+CodeBind Docs 核心类型：`Binding`、`BindingTarget`、`BindingAnchor`、`CbdIndex`。
 
 ## 要点
 

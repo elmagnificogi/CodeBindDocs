@@ -18,17 +18,17 @@ export interface BindingAnchor {
 export interface Binding {
   id: string;
   target: BindingTarget;
-  /** Path relative to `.cim/`, e.g. `docs/extension.md`. */
+  /** Path relative to docs/, e.g. `docs/extension.md`. */
   doc: string;
   anchors?: BindingAnchor[];
 }
 
-export interface CimIndex {
+export interface CbdIndex {
   version: 1;
   bindings: Binding[];
 }
 
-export function emptyIndex(): CimIndex {
+export function emptyIndex(): CbdIndex {
   return { version: 1, bindings: [] };
 }
 

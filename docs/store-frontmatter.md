@@ -1,18 +1,18 @@
 ---
-cim:
+cbd:
   target: src/store/frontmatter.ts
   kind: file
-  contentHash: 6533b51a8909
+  contentHash: b2b7af5229c5
 ---
 # frontmatter.ts
 
 ## 概述
 
-解析/序列化 Markdown 文件头中的 `cim:` YAML，以及正文与文件头的拆分合并。
+解析/序列化 Markdown 文件头中的 `cbd:` YAML，以及正文与文件头的拆分合并。
 
 ## API
 
-- `parseCimFrontmatter` / `serializeCimFrontmatter`：读写绑定元数据
+- `parseCbdFrontmatter` / `serializeCbdFrontmatter`：读写绑定元数据
 - `splitMarkdown` / `joinMarkdown`：面板编辑时隐藏文件头、保存时拼回
 - `frontmatterToBinding` / `bindingToFrontmatter`：与 `Binding` 互转
 

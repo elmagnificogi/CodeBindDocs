@@ -84,7 +84,7 @@ export function builtinDocTemplates(): DocTemplateChoice[] {
 }
 
 /**
- * Load templates from `cim.templatesPath` (default `{docsPath}/_templates`).
+ * Load templates from `cbd.templatesPath` (default `{docsPath}/_templates`).
  * If the folder has no `.md` files, returns built-ins.
  */
 export async function listDocTemplates(store: IndexStore): Promise<DocTemplateChoice[]> {
@@ -186,8 +186,8 @@ function splitTemplateFrontmatter(text: string): {
   if (!m) {
     return { meta: {}, body: normalized };
   }
-  // Do not treat as CIM binding frontmatter — only label/description.
-  if (/^\s*cim\s*:/m.test(m[1])) {
+  // Do not treat as CodeBind Docs binding frontmatter — only label/description.
+  if (/^\s*cbd\s*:/m.test(m[1])) {
     return { meta: {}, body: normalized };
   }
   const meta: { label?: string; description?: string } = {};

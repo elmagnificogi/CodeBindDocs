@@ -1,5 +1,5 @@
 ---
-cim:
+cbd:
   target: src/util/suggestSymbol.ts
   kind: file
   symbol: suggestSymbolInRange

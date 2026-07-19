@@ -1,9 +1,9 @@
 {
-  "name": "cim",
-  "displayName": "CIM — Code Integrated Manual",
+  "name": "codebind-docs",
+  "displayName": "CodeBind Docs",
   "description": "旁路绑定代码文档：源码零侵入，Markdown + 分栏同步，本地可 Git，人与 Agent 共用设计上下文。",
   "version": "0.1.0",
-  "publisher": "cim",
+  "publisher": "codebind",
   "license": "MIT",
   "keywords": [
     "documentation",
@@ -15,7 +15,8 @@
     "AGENTS.md",
     "code documentation",
     "split view",
-    "CIM"
+    "CBD",
+    "CodeBind Docs"
   ],
   "categories": [
     "Other",
@@ -35,82 +36,82 @@
   "contributes": {
     "commands": [
       {
-        "command": "cim.initialize",
-        "title": "CIM: Initialize"
+        "command": "cbd.initialize",
+        "title": "CBD: Initialize"
       },
       {
-        "command": "cim.bindCurrentFile",
-        "title": "CIM: Bind Doc to Current File"
+        "command": "cbd.bindCurrentFile",
+        "title": "CBD: Bind Doc to Current File"
       },
       {
-        "command": "cim.revealBoundDoc",
-        "title": "CIM: Reveal Bound Doc"
+        "command": "cbd.revealBoundDoc",
+        "title": "CBD: Reveal Bound Doc"
       },
       {
-        "command": "cim.toggleSplitSync",
-        "title": "CIM: Toggle Split Sync"
+        "command": "cbd.toggleSplitSync",
+        "title": "CBD: Toggle Split Sync"
       },
       {
-        "command": "cim.refreshTree",
-        "title": "CIM: Refresh Doc Tree",
+        "command": "cbd.refreshTree",
+        "title": "CBD: Refresh Doc Tree",
         "icon": "$(refresh)"
       },
       {
-        "command": "cim.openTarget",
-        "title": "CIM: Open Bound Source"
+        "command": "cbd.openTarget",
+        "title": "CBD: Open Bound Source"
       },
       {
-        "command": "cim.revealSourceRange",
-        "title": "CIM: Reveal Source Range"
+        "command": "cbd.revealSourceRange",
+        "title": "CBD: Reveal Source Range"
       },
       {
-        "command": "cim.openDoc",
-        "title": "CIM: Open Bound Doc"
+        "command": "cbd.openDoc",
+        "title": "CBD: Open Bound Doc"
       },
       {
-        "command": "cim.openDocsIndex",
-        "title": "CIM: Open Docs Index",
+        "command": "cbd.openDocsIndex",
+        "title": "CBD: Open Docs Index",
         "icon": "$(book)"
       },
       {
-        "command": "cim.deleteDoc",
-        "title": "CIM: Delete Bound Doc",
+        "command": "cbd.deleteDoc",
+        "title": "CBD: Delete Bound Doc",
         "icon": "$(trash)"
       },
       {
-        "command": "cim.rebindDoc",
-        "title": "CIM: Rebind Doc to Source"
+        "command": "cbd.rebindDoc",
+        "title": "CBD: Rebind Doc to Source"
       },
       {
-        "command": "cim.retightenRange",
-        "title": "CIM: Retighten Range by Symbol"
+        "command": "cbd.retightenRange",
+        "title": "CBD: Retighten Range by Symbol"
       },
       {
-        "command": "cim.showDriftIssues",
-        "title": "CIM: Show Binding Drift"
+        "command": "cbd.showDriftIssues",
+        "title": "CBD: Show Binding Drift"
       },
       {
-        "command": "cim.refreshDocHash",
-        "title": "CIM: Refresh Doc contentHash"
+        "command": "cbd.refreshDocHash",
+        "title": "CBD: Refresh Doc contentHash"
       },
       {
-        "command": "cim.refreshAllDocHashes",
-        "title": "CIM: Mark All Docs Checked (contentHash)"
+        "command": "cbd.refreshAllDocHashes",
+        "title": "CBD: Mark All Docs Checked (contentHash)"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "cim",
-          "title": "CIM",
-          "icon": "media/cim.svg"
+          "id": "cbd",
+          "title": "CodeBind Docs",
+          "icon": "media/cbd.svg"
         }
       ]
     },
     "views": {
-      "cim": [
+      "cbd": [
         {
-          "id": "cim.bindings",
+          "id": "cbd.bindings",
           "name": "Bindings"
         }
       ]
@@ -118,73 +119,73 @@
     "menus": {
       "view/title": [
         {
-          "command": "cim.openDocsIndex",
-          "when": "view == cim.bindings",
+          "command": "cbd.openDocsIndex",
+          "when": "view == cbd.bindings",
           "group": "navigation"
         },
         {
-          "command": "cim.refreshTree",
-          "when": "view == cim.bindings",
+          "command": "cbd.refreshTree",
+          "when": "view == cbd.bindings",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "cim.openTarget",
-          "when": "view == cim.bindings && viewItem == binding",
+          "command": "cbd.openTarget",
+          "when": "view == cbd.bindings && viewItem == binding",
           "group": "inline"
         },
         {
-          "command": "cim.openDoc",
-          "when": "view == cim.bindings && viewItem == binding",
+          "command": "cbd.openDoc",
+          "when": "view == cbd.bindings && viewItem == binding",
           "group": "inline"
         },
         {
-          "command": "cim.deleteDoc",
-          "when": "view == cim.bindings && viewItem == binding",
+          "command": "cbd.deleteDoc",
+          "when": "view == cbd.bindings && viewItem == binding",
           "group": "1_modification"
         },
         {
-          "command": "cim.rebindDoc",
-          "when": "view == cim.bindings && viewItem == binding",
+          "command": "cbd.rebindDoc",
+          "when": "view == cbd.bindings && viewItem == binding",
           "group": "1_modification"
         },
         {
-          "command": "cim.bindCurrentFile",
-          "when": "view == cim.bindings && viewItem == unbound",
+          "command": "cbd.bindCurrentFile",
+          "when": "view == cbd.bindings && viewItem == unbound",
           "group": "inline"
         }
       ]
     },
     "configuration": {
-      "title": "CIM",
+      "title": "CodeBind Docs",
       "properties": {
-        "cim.docsPath": {
+        "cbd.docsPath": {
           "type": "string",
           "default": "docs",
-          "description": "Workspace-relative folder for CIM Markdown docs (bindings via YAML frontmatter). Default: docs"
+          "description": "Workspace-relative folder for CodeBind Docs Markdown docs (bindings via YAML frontmatter). Default: docs"
         },
-        "cim.assetsPath": {
+        "cbd.assetsPath": {
           "type": "string",
           "default": "",
           "description": "Workspace-relative folder for doc assets. Empty = {docsPath}/assets"
         },
-        "cim.templatesPath": {
+        "cbd.templatesPath": {
           "type": "string",
           "default": "",
           "description": "Workspace-relative folder for new-doc Markdown templates ({{title}} placeholder). Empty = {docsPath}/_templates. If the folder has .md files they are used; otherwise built-in templates apply."
         },
-        "cim.splitSync.enabled": {
+        "cbd.splitSync.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Automatically open the bound Markdown doc in a side editor when switching source files."
         },
-        "cim.splitSync.promptWhenUnbound": {
+        "cbd.splitSync.promptWhenUnbound": {
           "type": "boolean",
           "default": true,
-          "description": "When opening a source file with no CIM binding, show the unbound pane with a create button."
+          "description": "When opening a source file with no CodeBind Docs binding, show the unbound pane with a create button."
         },
-        "cim.splitSync.viewColumn": {
+        "cbd.splitSync.viewColumn": {
           "type": "string",
           "enum": [
             "Beside",
@@ -193,7 +194,7 @@
           "default": "Beside",
           "description": "Where to open bound docs: Beside the active editor, or always ViewColumn.Two."
         },
-        "cim.docPane.mode": {
+        "cbd.docPane.mode": {
           "type": "string",
           "enum": [
             "ir",
@@ -206,7 +207,7 @@
           ],
           "description": "Markdown pane mode. ir = Typora-like instant rendering; source = plain Markdown text."
         },
-        "cim.docPane.outline": {
+        "cbd.docPane.outline": {
           "type": "boolean",
           "default": true,
           "description": "Show a document outline (TOC) beside the instant-rendering editor."

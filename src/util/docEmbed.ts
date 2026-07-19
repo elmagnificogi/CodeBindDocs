@@ -12,12 +12,12 @@ export type IncludeSpec = {
 };
 
 /**
- * Expand `cim-include` fences into `cim-include-view` fences with embedded
+ * Expand `cbd-include` fences into `cbd-include-view` fences with embedded
  * body (readonly preview). Save path collapses them back.
  *
  * Author syntax:
  * ````
- * ```cim-include
+ * ```cbd-include
  * doc: docs/foo.md
  * heading: 概述
  * lines: 10-40
@@ -29,7 +29,7 @@ export async function expandDocIncludes(
   store: IndexStore,
   currentDocRel: string
 ): Promise<string> {
-  return replaceFences(markdown, 'cim-include', 'cim-include-view', async (metaBlock) => {
+  return replaceFences(markdown, 'cbd-include', 'cbd-include-view', async (metaBlock) => {
     const spec = parseIncludeMeta(metaBlock);
     if (!spec?.doc) {
       return null;
@@ -50,9 +50,9 @@ export async function expandDocIncludes(
   });
 }
 
-/** Collapse `cim-include-view` back to compact `cim-include` fences. */
+/** Collapse `cbd-include-view` back to compact `cbd-include` fences. */
 export function collapseDocIncludes(markdown: string): string {
-  return replaceFencesSync(markdown, 'cim-include-view', 'cim-include', (inner) => {
+  return replaceFencesSync(markdown, 'cbd-include-view', 'cbd-include', (inner) => {
     const spec = parseIncludeMeta(inner);
     if (!spec?.doc) {
       return null;

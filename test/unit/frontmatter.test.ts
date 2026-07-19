@@ -3,8 +3,8 @@ import {
   bindingToFrontmatter,
   frontmatterToBinding,
   joinMarkdown,
-  parseCimFrontmatter,
-  serializeCimFrontmatter,
+  parseCbdFrontmatter,
+  serializeCbdFrontmatter,
   splitMarkdown,
 } from '../../src/store/frontmatter';
 import { Binding } from '../../src/store/types';
@@ -12,7 +12,7 @@ import { Binding } from '../../src/store/types';
 suite('frontmatter', () => {
   test('splitMarkdown extracts header and body', () => {
     const md = `---
-cim:
+cbd:
   target: src/a.ts
   kind: file
 ---
@@ -27,21 +27,21 @@ body
 
   test('splitMarkdown strips BOM and nested duplicate frontmatter in body', () => {
     const md =
-      '\uFEFF---\ncim:\n  target: src/a.ts\n  kind: file\n---\n---\ncim:\n  target: src/a.ts\n  kind: file\n---\n# X\n';
+      '\uFEFF---\ncbd:\n  target: src/a.ts\n  kind: file\n---\n---\ncbd:\n  target: src/a.ts\n  kind: file\n---\n# X\n';
     const { body } = splitMarkdown(md);
     assert.ok(!body.startsWith('---'));
     assert.ok(body.includes('# X'));
   });
 
   test('joinMarkdown concatenates header and body', () => {
-    const joined = joinMarkdown('---\ncim:\n  target: x\n---\n', '# T\n');
+    const joined = joinMarkdown('---\ncbd:\n  target: x\n---\n', '# T\n');
     assert.ok(joined.startsWith('---'));
     assert.ok(joined.includes('# T'));
   });
 
-  test('parseCimFrontmatter reads range fields', () => {
+  test('parseCbdFrontmatter reads range fields', () => {
     const md = `---
-cim:
+cbd:
   target: src/foo.ts
   kind: range
   startLine: 10
@@ -51,7 +51,7 @@ cim:
 ---
 # Doc
 `;
-    const { meta, body } = parseCimFrontmatter(md);
+    const { meta, body } = parseCbdFrontmatter(md);
     assert.ok(meta);
     assert.strictEqual(meta!.target, 'src/foo.ts');
     assert.strictEqual(meta!.kind, 'range');
@@ -64,7 +64,7 @@ cim:
 
   test('serialize and parse round-trip', () => {
     const body = '# Title\n\ntext\n';
-    const md = serializeCimFrontmatter(
+    const md = serializeCbdFrontmatter(
       {
         target: 'src/x.ts',
         kind: 'file',
@@ -73,7 +73,7 @@ cim:
       },
       body
     );
-    const { meta } = parseCimFrontmatter(md);
+    const { meta } = parseCbdFrontmatter(md);
     assert.strictEqual(meta?.target, 'src/x.ts');
     assert.strictEqual(meta?.symbol, 'activate');
     assert.strictEqual(meta?.contentHash, 'deadbeef');

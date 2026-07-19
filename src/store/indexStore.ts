@@ -3,28 +3,28 @@ import * as crypto from 'crypto';
 import {
   bindingToFrontmatter,
   frontmatterToBinding,
-  parseCimFrontmatter,
-  serializeCimFrontmatter,
+  parseCbdFrontmatter,
+  serializeCbdFrontmatter,
 } from './frontmatter';
 import {
   Binding,
-  CimIndex,
+  CbdIndex,
   emptyIndex,
   normalizeRelPath,
 } from './types';
 
-/** Default workspace-relative docs folder (configurable via `cim.docsPath`). */
+/** Default workspace-relative docs folder (configurable via `cbd.docsPath`). */
 export const DEFAULT_DOCS_PATH = 'docs';
 /** Auto-generated overview filename inside the docs folder. */
-export const INDEX_FILE_NAME = 'cim-index.md';
+export const INDEX_FILE_NAME = 'cbd-index.md';
 
 /**
  * Binding source of truth: YAML frontmatter in Markdown under the configured docs path.
  *
- * Default docs path: `docs/` (not under `.cim/`).
+ * Default docs path: `docs/` (not under docs/).
  */
 export class IndexStore {
-  private cache: CimIndex | undefined;
+  private cache: CbdIndex | undefined;
   private cacheMs = 0;
 
   constructor(readonly workspaceFolder: vscode.WorkspaceFolder) {}
@@ -32,7 +32,7 @@ export class IndexStore {
   /** Workspace-relative docs root, e.g. `docs` or `documentation`. */
   get docsPath(): string {
     const raw = vscode.workspace
-      .getConfiguration('cim')
+      .getConfiguration('cbd')
       .get<string>('docsPath', DEFAULT_DOCS_PATH);
     const cleaned = normalizeRelPath(raw || DEFAULT_DOCS_PATH).replace(/\/+$/, '');
     return cleaned || DEFAULT_DOCS_PATH;
@@ -40,7 +40,7 @@ export class IndexStore {
 
   /** Workspace-relative assets folder. */
   get assetsPath(): string {
-    const raw = vscode.workspace.getConfiguration('cim').get<string>('assetsPath', '');
+    const raw = vscode.workspace.getConfiguration('cbd').get<string>('assetsPath', '');
     if (raw?.trim()) {
       return normalizeRelPath(raw).replace(/\/+$/, '');
     }
@@ -52,7 +52,7 @@ export class IndexStore {
    * Empty setting → `{docsPath}/_templates`.
    */
   get templatesPath(): string {
-    const raw = vscode.workspace.getConfiguration('cim').get<string>('templatesPath', '');
+    const raw = vscode.workspace.getConfiguration('cbd').get<string>('templatesPath', '');
     if (raw?.trim()) {
       return normalizeRelPath(raw).replace(/\/+$/, '');
     }
@@ -118,8 +118,8 @@ export class IndexStore {
     await vscode.workspace.fs.createDirectory(this.workspaceUri(this.templatesPath));
   }
 
-  /** Scan Markdown docs and build bindings from `cim:` frontmatter. */
-  async read(): Promise<CimIndex> {
+  /** Scan Markdown docs and build bindings from `cbd:` frontmatter. */
+  async read(): Promise<CbdIndex> {
     const now = Date.now();
     if (this.cache && now - this.cacheMs < 500) {
       return this.cache;
@@ -152,7 +152,7 @@ export class IndexStore {
       try {
         const raw = await vscode.workspace.fs.readFile(uri);
         const text = Buffer.from(raw).toString('utf8');
-        const { meta } = parseCimFrontmatter(text);
+        const { meta } = parseCbdFrontmatter(text);
         if (!meta) {
           continue;
         }
@@ -181,7 +181,7 @@ export class IndexStore {
       const raw = await vscode.workspace.fs.readFile(uri);
       const text = Buffer.from(raw).toString('utf8');
       existed = true;
-      body = parseCimFrontmatter(text).body || body;
+      body = parseCbdFrontmatter(text).body || body;
     } catch {
       const parent = vscode.Uri.joinPath(uri, '..');
       await vscode.workspace.fs.createDirectory(parent);
@@ -192,7 +192,7 @@ export class IndexStore {
       body = options.body;
     }
 
-    const content = serializeCimFrontmatter(bindingToFrontmatter(binding), body);
+    const content = serializeCbdFrontmatter(bindingToFrontmatter(binding), body);
     await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
     this.invalidateCache();
     if (options?.refreshIndex !== false) {
@@ -201,7 +201,7 @@ export class IndexStore {
   }
 
   /**
-   * Delete a bound Markdown doc file and refresh `cim-index.md`.
+   * Delete a bound Markdown doc file and refresh `cbd-index.md`.
    * Refuses to delete the generated index page itself.
    */
   async deleteDoc(docWorkspaceRel: string): Promise<void> {
@@ -210,7 +210,7 @@ export class IndexStore {
       throw new Error(`文档不在文档目录内: ${rel}`);
     }
     if (this.isIndexDoc(rel)) {
-      throw new Error('不能删除自动生成的 cim-index.md');
+      throw new Error('不能删除自动生成的 cbd-index.md');
     }
     const uri = this.docUri(rel);
     try {
@@ -223,20 +223,20 @@ export class IndexStore {
     await this.writeDocsIndex();
   }
 
-  /** Generate `{docsPath}/cim-index.md` — overview of all bindings. */
+  /** Generate `{docsPath}/cbd-index.md` — overview of all bindings. */
   async writeDocsIndex(): Promise<vscode.Uri> {
     await this.ensureLayout();
     this.invalidateCache();
     const index = await this.read();
     const indexPath = this.indexDocPath;
     const lines: string[] = [
-      '# CIM 文档汇总',
+      '# CodeBind Docs 文档汇总',
       '',
-      `共 **${index.bindings.length}** 个绑定。由 CIM 自动生成，请勿手改（绑定变更后会覆盖）。`,
+      `共 **${index.bindings.length}** 个绑定。由 CodeBind Docs 自动生成，请勿手改（绑定变更后会覆盖）。`,
       '',
-      `文档目录：\`${this.docsPath}/\`（设置项 \`cim.docsPath\`）。`,
+      `文档目录：\`${this.docsPath}/\`（设置项 \`cbd.docsPath\`）。`,
       '',
-      '绑定声明在各文档 YAML 头的 `cim.target`；本页仅作目录。',
+      '绑定声明在各文档 YAML 头的 `cbd.target`；本页仅作目录。',
       '',
       '| 源文件 | 文档 | 类型 |',
       '| --- | --- | --- |',
@@ -266,10 +266,10 @@ export class IndexStore {
     }
 
     lines.push('', '## 快捷操作', '');
-    lines.push('- 命令面板：`CIM: Open Docs Index` 打开本页');
-    lines.push('- 命令面板：`CIM: Bind Doc to Current File` 为当前源文件创建绑定');
-    lines.push('- 命令面板：`CIM: Delete Bound Doc` 删除绑定文档');
-    lines.push('- 侧栏 **CIM → Bindings** 可跳转源码 / 文档 / 删除');
+    lines.push('- 命令面板：`CBD: Open Docs Index` 打开本页');
+    lines.push('- 命令面板：`CBD: Bind Doc to Current File` 为当前源文件创建绑定');
+    lines.push('- 命令面板：`CBD: Delete Bound Doc` 删除绑定文档');
+    lines.push('- 侧栏 **CodeBind Docs → Bindings** 可跳转源码 / 文档 / 删除');
     lines.push('');
 
     const uri = this.docUri(indexPath);
@@ -278,7 +278,7 @@ export class IndexStore {
   }
 
   /**
-   * Update `cim.target` after a rename.
+   * Update `cbd.target` after a rename.
    * Matches exact path, and also directory prefix (`src/foo` → `src/bar`
    * updates `src/foo/a.ts` → `src/bar/a.ts`).
    * @returns number of bindings updated
@@ -316,12 +316,12 @@ export class IndexStore {
     return normalizeRelPath(rel);
   }
 
-  findByTargetPath(index: CimIndex, targetPath: string): Binding | undefined {
+  findByTargetPath(index: CbdIndex, targetPath: string): Binding | undefined {
     const all = this.findBindingsForTarget(index, targetPath);
     return all.find((b) => b.target.kind === 'file') ?? all[0];
   }
 
-  findBindingsForTarget(index: CimIndex, targetPath: string): Binding[] {
+  findBindingsForTarget(index: CbdIndex, targetPath: string): Binding[] {
     const norm = normalizeRelPath(targetPath);
     return index.bindings.filter((b) => normalizeRelPath(b.target.path) === norm);
   }
@@ -330,7 +330,7 @@ export class IndexStore {
    * Prefer the tightest range covering `line1Based`, else file-level binding.
    */
   resolveBindingForLine(
-    index: CimIndex,
+    index: CbdIndex,
     targetPath: string,
     line1Based: number
   ): Binding | undefined {
@@ -362,7 +362,7 @@ export class IndexStore {
     return forFile.find((b) => b.target.kind === 'file');
   }
 
-  findByDocPath(index: CimIndex, docPath: string): Binding | undefined {
+  findByDocPath(index: CbdIndex, docPath: string): Binding | undefined {
     const norm = normalizeRelPath(docPath);
     return index.bindings.find((b) => normalizeRelPath(b.doc) === norm);
   }
@@ -400,9 +400,9 @@ export class IndexStore {
 
     try {
       const raw = await vscode.workspace.fs.readFile(uri);
-      const { meta, body } = parseCimFrontmatter(Buffer.from(raw).toString('utf8'));
+      const { meta, body } = parseCbdFrontmatter(Buffer.from(raw).toString('utf8'));
       if (!meta) {
-        const content = serializeCimFrontmatter(
+        const content = serializeCbdFrontmatter(
           bindingToFrontmatter(binding),
           body || defaultDocBody(title)
         );
@@ -412,7 +412,7 @@ export class IndexStore {
     } catch {
       const parent = vscode.Uri.joinPath(uri, '..');
       await vscode.workspace.fs.createDirectory(parent);
-      const content = serializeCimFrontmatter(
+      const content = serializeCbdFrontmatter(
         bindingToFrontmatter(binding),
         defaultDocBody(title)
       );

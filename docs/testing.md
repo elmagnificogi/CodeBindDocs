@@ -24,7 +24,7 @@ test/
 ## 覆盖范围
 
 - **单测**：types、frontmatter、mdProtect、rangeOverlap、symbolRange、docMedia、docEmbed、docTemplates、bindableSources、relativeMarkdownLink
-- **集成**：`cim.initialize`、IndexStore 扫描 binding、`updateTargetPath` 目录前缀、contentHash 刷新
+- **集成**：`cbd.initialize`、IndexStore 扫描 binding、`updateTargetPath` 目录前缀、contentHash 刷新
 - **不测**：Vditor DOM、剪贴板粘贴、QuickPick/状态栏选区交互
 
 ## CI

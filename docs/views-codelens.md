@@ -1,22 +1,22 @@
 ---
-cim:
-  target: src/views/cimCodeLens.ts
+cbd:
+  target: src/views/cbdCodeLens.ts
   kind: file
-  symbol: CimCodeLensProvider
-  contentHash: df33b85964c6
+  symbol: CbdCodeLensProvider
+  contentHash: 0a72661ce87f
 ---
-# cimCodeLens.ts
+# cbdCodeLens.ts
 
 ## 概述
 
-源码 CodeLens：文件顶部「打开 CIM 文档」+ range 行上的代码块文档入口。
+源码 CodeLens：文件顶部「打开 CodeBind Docs 文档」+ range 行上的代码块文档入口。
 
 ## 行为
 
 - 仅文件协议；忽略文档目录内文件
-- 有任意绑定时，第 0 行显示 `CIM: 打开文档`（多篇时带数量）→ `cim.revealBoundDoc`
-- range 挂在 `startLine`；文案含 symbol 或行范围 → `cim.openDoc`
-- 另：状态栏 `CIM 文档`（见 SplitSync）
+- 有任意绑定时，第 0 行显示 `CBD: 打开文档`（多篇时带数量）→ `cbd.revealBoundDoc`
+- range 挂在 `startLine`；文案含 symbol 或行范围 → `cbd.openDoc`
+- 另：状态栏 `CodeBind Docs 文档`（见 SplitSync）
 - 绑定变更后调用 `refresh()`
 
 ## 约束

@@ -1,6 +1,6 @@
 import { Binding, BindingKind, normalizeRelPath } from './types';
 
-export interface CimFrontmatter {
+export interface CbdFrontmatter {
   target: string;
   kind: BindingKind;
   startLine?: number;
@@ -46,9 +46,9 @@ export function joinMarkdown(header: string | undefined, body: string): string {
   return header + normalized;
 }
 
-/** Parse YAML-ish `cim:` block from Markdown frontmatter. */
-export function parseCimFrontmatter(markdown: string): {
-  meta: CimFrontmatter | undefined;
+/** Parse YAML-ish `cbd:` block from Markdown frontmatter. */
+export function parseCbdFrontmatter(markdown: string): {
+  meta: CbdFrontmatter | undefined;
   body: string;
 } {
   const text = stripBom(markdown);
@@ -62,21 +62,21 @@ export function parseCimFrontmatter(markdown: string): {
   while (FRONTMATTER_RE.test(body)) {
     body = body.replace(FRONTMATTER_RE, '');
   }
-  const meta = parseCimYaml(yaml);
+  const meta = parseCbdYaml(yaml);
   return { meta, body };
 }
 
-function parseCimYaml(yaml: string): CimFrontmatter | undefined {
+function parseCbdYaml(yaml: string): CbdFrontmatter | undefined {
   const lines = yaml.split(/\r?\n/);
-  let inCim = false;
+  let inCbd = false;
   const values: Record<string, string> = {};
 
   for (const raw of lines) {
     const line = raw.replace(/\t/g, '  ');
-    if (!inCim) {
-      if (/^cim:\s*$/.test(line.trimEnd()) || /^cim:\s*\S/.test(line)) {
-        inCim = true;
-        const inline = line.match(/^cim:\s+(\S.*)$/);
+    if (!inCbd) {
+      if (/^cbd:\s*$/.test(line.trimEnd()) || /^cbd:\s*\S/.test(line)) {
+        inCbd = true;
+        const inline = line.match(/^cbd:\s+(\S.*)$/);
         if (inline) {
           // unsupported inline map; ignore
         }
@@ -85,7 +85,7 @@ function parseCimYaml(yaml: string): CimFrontmatter | undefined {
     }
 
     if (/^\S/.test(line) && !/^\s/.test(raw)) {
-      // left the cim: indentation block
+      // left the cbd: indentation block
       break;
     }
 
@@ -110,7 +110,7 @@ function parseCimYaml(yaml: string): CimFrontmatter | undefined {
   }
 
   const kind: BindingKind = values.kind === 'range' ? 'range' : 'file';
-  const meta: CimFrontmatter = {
+  const meta: CbdFrontmatter = {
     target: normalizeRelPath(target),
     kind,
   };
@@ -130,8 +130,8 @@ function parseCimYaml(yaml: string): CimFrontmatter | undefined {
   return meta;
 }
 
-export function serializeCimFrontmatter(meta: CimFrontmatter, body: string): string {
-  const lines = ['---', 'cim:', `  target: ${meta.target}`, `  kind: ${meta.kind}`];
+export function serializeCbdFrontmatter(meta: CbdFrontmatter, body: string): string {
+  const lines = ['---', 'cbd:', `  target: ${meta.target}`, `  kind: ${meta.kind}`];
   if (meta.kind === 'range') {
     if (typeof meta.startLine === 'number') {
       lines.push(`  startLine: ${meta.startLine}`);
@@ -150,15 +150,15 @@ export function serializeCimFrontmatter(meta: CimFrontmatter, body: string): str
   const normalizedBody = stripBom(body).replace(/^\r?\n/, '');
   // Avoid writing nested --- frontmatter into the body
   const safeBody = FRONTMATTER_RE.test(normalizedBody)
-    ? parseCimFrontmatter(normalizedBody).body.replace(/^\r?\n/, '')
+    ? parseCbdFrontmatter(normalizedBody).body.replace(/^\r?\n/, '')
     : normalizedBody;
   return lines.join('\n') + safeBody;
 }
 
-export function frontmatterToBinding(docRelFromCim: string, meta: CimFrontmatter): Binding {
+export function frontmatterToBinding(docRelFromCbd: string, meta: CbdFrontmatter): Binding {
   return {
-    id: normalizeRelPath(docRelFromCim),
-    doc: normalizeRelPath(docRelFromCim),
+    id: normalizeRelPath(docRelFromCbd),
+    doc: normalizeRelPath(docRelFromCbd),
     target: {
       path: meta.target,
       kind: meta.kind,
@@ -171,7 +171,7 @@ export function frontmatterToBinding(docRelFromCim: string, meta: CimFrontmatter
   };
 }
 
-export function bindingToFrontmatter(binding: Binding): CimFrontmatter {
+export function bindingToFrontmatter(binding: Binding): CbdFrontmatter {
   const anchor = binding.anchors?.[0];
   return {
     target: normalizeRelPath(binding.target.path),
