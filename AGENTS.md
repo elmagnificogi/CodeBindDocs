@@ -10,6 +10,8 @@
 - `docs/assets/` — 可选媒体（可用 `cim.assetsPath` 覆盖）
 - `docs/_templates/` — 新建文档模板（可用 `cim.templatesPath` 覆盖；支持 `{{title}}`）
 - `docs/REQUIREMENTS.md` — 产品需求（无绑定头）
+- `docs/USER_GUIDE.md` — **最终用户使用说明**（安装、绑定、漂移、设置）
+- `docs/DEVELOPMENT.md` — 扩展开发与调试
 - `docs/testing.md` — 单元 / 集成测试说明
 - `test/` — Mocha 单测 + Extension Host 冒烟（`npm test`）
 

@@ -4,6 +4,8 @@
 
 CIM（Code-In-Markdown / Code Integrated Manual）是 VS Code / Cursor 扩展：用**旁路绑定**把设计文档与源码关联起来，在编辑器中**左右分栏**同步查看与编辑，且不修改原始源码。
 
+**最终用户手册**：[USER_GUIDE.md](USER_GUIDE.md) · **市场简介**：[readme.md](../readme.md)
+
 ## 目标
 
 - 文档与代码同仓库、可版本控制、本地可用，无强制云端。

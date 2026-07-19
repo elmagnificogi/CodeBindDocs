@@ -1,17 +1,33 @@
 {
   "name": "cim",
   "displayName": "CIM — Code Integrated Manual",
-  "description": "Sidecar docs bound to source files, shown in a split pane for VS Code and Cursor.",
+  "description": "旁路绑定代码文档：源码零侵入，Markdown + 分栏同步，本地可 Git，人与 Agent 共用设计上下文。",
   "version": "0.1.0",
   "publisher": "cim",
   "license": "MIT",
-  "engines": {
-    "vscode": "^1.85.0"
-  },
+  "keywords": [
+    "documentation",
+    "markdown",
+    "sidecar",
+    "binding",
+    "docs",
+    "agent",
+    "AGENTS.md",
+    "code documentation",
+    "split view",
+    "CIM"
+  ],
   "categories": [
     "Other",
     "Documentation"
   ],
+  "galleryBanner": {
+    "color": "#1e293b",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
