@@ -1,0 +1,11 @@
+.vscode/**
+.cim/**
+docs/**
+src/**
+node_modules/**
+.gitignore
+tsconfig.json
+**/*.ts
+**/*.map
+AGENTS.md
+readme.md

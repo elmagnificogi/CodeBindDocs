@@ -1,0 +1,164 @@
+{
+  "name": "cim",
+  "displayName": "CIM — Code Integrated Manual",
+  "description": "Sidecar docs bound to source files, shown in a split pane for VS Code and Cursor.",
+  "version": "0.1.0",
+  "publisher": "cim",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Documentation"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cim.initialize",
+        "title": "CIM: Initialize"
+      },
+      {
+        "command": "cim.bindCurrentFile",
+        "title": "CIM: Bind Doc to Current File"
+      },
+      {
+        "command": "cim.revealBoundDoc",
+        "title": "CIM: Reveal Bound Doc"
+      },
+      {
+        "command": "cim.toggleSplitSync",
+        "title": "CIM: Toggle Split Sync"
+      },
+      {
+        "command": "cim.refreshTree",
+        "title": "CIM: Refresh Doc Tree",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "cim.openTarget",
+        "title": "CIM: Open Bound Source"
+      },
+      {
+        "command": "cim.openDoc",
+        "title": "CIM: Open Bound Doc"
+      },
+      {
+        "command": "cim.openDocsIndex",
+        "title": "CIM: Open Docs Index",
+        "icon": "$(book)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cim",
+          "title": "CIM",
+          "icon": "media/cim.svg"
+        }
+      ]
+    },
+    "views": {
+      "cim": [
+        {
+          "id": "cim.bindings",
+          "name": "Bindings"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "cim.openDocsIndex",
+          "when": "view == cim.bindings",
+          "group": "navigation"
+        },
+        {
+          "command": "cim.refreshTree",
+          "when": "view == cim.bindings",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "cim.openTarget",
+          "when": "view == cim.bindings && viewItem == binding",
+          "group": "inline"
+        },
+        {
+          "command": "cim.openDoc",
+          "when": "view == cim.bindings && viewItem == binding",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CIM",
+      "properties": {
+        "cim.docsPath": {
+          "type": "string",
+          "default": "docs",
+          "description": "Workspace-relative folder for CIM Markdown docs (bindings via YAML frontmatter). Default: docs"
+        },
+        "cim.assetsPath": {
+          "type": "string",
+          "default": "",
+          "description": "Workspace-relative folder for doc assets. Empty = {docsPath}/assets"
+        },
+        "cim.splitSync.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open the bound Markdown doc in a side editor when switching source files."
+        },
+        "cim.splitSync.promptWhenUnbound": {
+          "type": "boolean",
+          "default": true,
+          "description": "When opening a source file with no CIM binding, show the unbound pane with a create button."
+        },
+        "cim.splitSync.viewColumn": {
+          "type": "string",
+          "enum": [
+            "Beside",
+            "Two"
+          ],
+          "default": "Beside",
+          "description": "Where to open bound docs: Beside the active editor, or always ViewColumn.Two."
+        },
+        "cim.docPane.mode": {
+          "type": "string",
+          "enum": [
+            "ir",
+            "sv"
+          ],
+          "default": "ir",
+          "enumDescriptions": [
+            "Instant Rendering (Typora-like: type Markdown, render live)",
+            "Split view source + preview"
+          ],
+          "description": "Markdown pane mode. ir = Typora-like instant rendering; sv = source/preview split."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./ && node scripts/copy-vditor.js",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies",
+    "debug": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/debug.ps1",
+    "debug:watch": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/debug.ps1 -Watch",
+    "open:vscode": "npm run debug"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "vditor": "^3.11.2"
+  }
+}

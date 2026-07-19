@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run CIM in VS Code",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${env:LOCALAPPDATA}\\Programs\\Microsoft VS Code\\Code.exe",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--disable-extensions",
+        "${workspaceFolder}"
+      ],
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
+      "preLaunchTask": "npm: compile",
+      "debugWebWorkerExtensions": false
+    },
+    {
+      "name": "Run CIM in VS Code (empty window)",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${env:LOCALAPPDATA}\\Programs\\Microsoft VS Code\\Code.exe",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--disable-extensions"
+      ],
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
+      "preLaunchTask": "npm: compile",
+      "debugWebWorkerExtensions": false
+    },
+    {
+      "name": "Run CIM in Cursor (fallback)",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--disable-extensions"
+      ],
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
+      "preLaunchTask": "npm: compile",
+      "debugWebWorkerExtensions": false
+    }
+  ]
+}
