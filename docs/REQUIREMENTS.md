@@ -33,7 +33,7 @@ CIM（Code-In-Markdown / Code Integrated Manual）是 VS Code / Cursor 扩展：
 | CodeLens | 源码 range 绑定行上方可点击打开代码块文档 |
 | 主页 | 已绑定列表 + **绑定缺失**分区（源文件缺失 / 文档缺失）及操作入口 |
 | 漂移检测 | 改名更新 `cim.target`；缺失/hash/行范围诊断；状态栏提示 |
-| 删除 | 删除绑定文档；**两次确认**；文件进回收站；面板删除按钮为红色 |
+| 删除 | 删除绑定文档；确认一次后删除；文件进回收站；面板删除按钮为红色 |
 | 重新绑定 | 选源文件 → 选**整文件或代码块（选区）**；可改路径、行范围与 symbol |
 | Agent | `AGENTS.md` + `.cursor/rules/cim.mdc`；模块→文档对照表 |
 
@@ -103,7 +103,7 @@ cim:
 ### 删除
 
 - 入口：面板「删除」、侧栏右键、命令面板 `CIM: Delete Bound Doc`
-- **两次确认**（确定删除 → 确认删除）
+- **一次确认**后删除
 - 不可删除自动生成的 `cim-index.md`
 - 删除后刷新树、CodeLens、漂移；若正在看该文档或在主页则回到主页
 
@@ -114,7 +114,7 @@ cim:
 | `CIM: Initialize` | 文档目录与 Agent 脚手架 |
 | `CIM: Bind Doc to Current File` | 新建整文件/代码块绑定 |
 | `CIM: Rebind Doc to Source` | 失效或改绑（含代码块选区） |
-| `CIM: Delete Bound Doc` | 删除绑定文档（两次确认） |
+| `CIM: Delete Bound Doc` | 删除绑定文档（需确认） |
 | `CIM: Reveal Bound Doc` | 打开当前文件绑定文档 |
 | `CIM: Open Docs Index` | 打开主页 / 汇总 |
 | `CIM: Toggle Split Sync` | 开关分栏同步 |
@@ -133,7 +133,7 @@ cim:
 2. 绑定与文档可提交 Git；源码无 CIM 标记污染。
 3. 改名可更新 `cim.target`，或主页提示缺失并可改绑/删除。
 4. 重新绑定支持整文件与代码块选区。
-5. 删除需两次确认；`cim-index` 不可删。
+5. 删除需确认；`cim-index` 不可删。
 6. Agent 规则与对照表存在；`src/**` 均有绑定文档。
 7. 即时渲染与源码切换流畅；新建文档顶部无多余「幽灵代码块」。
 

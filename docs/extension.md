@@ -25,7 +25,7 @@ cim:
 | `cim.bindCurrentFile` | 整文件或代码块绑定 |
 | `cim.revealBoundDoc` | 打开当前文件绑定文档 |
 | `cim.openDocsIndex` | 主页 / 汇总 |
-| `cim.deleteDoc` | 删除绑定文档（两次确认） |
+| `cim.deleteDoc` | 删除绑定文档（需确认） |
 | `cim.rebindDoc` | 将文档改绑：选源文件 → 整文件或代码块（状态栏确认选区） |
 | `cim.toggleSplitSync` | 开关分栏同步 |
 | `cim.refreshTree` | 刷新树与漂移扫描 |

@@ -443,15 +443,6 @@ async function deleteDoc(
     return;
   }
 
-  const confirmAgain = await vscode.window.showWarningMessage(
-    `二次确认：真的要删除「${docRel}」吗？\n此操作无法在扩展内撤销。`,
-    { modal: true },
-    '确认删除'
-  );
-  if (confirmAgain !== '确认删除') {
-    return;
-  }
-
   const wasCurrent = splitSync?.currentDocRel() === docRel;
   splitSync?.releaseDoc(docRel);
   try {

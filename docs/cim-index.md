@@ -1,6 +1,6 @@
 # CIM 文档汇总
 
-共 **14** 个绑定。由 CIM 自动生成，请勿手改（绑定变更后会覆盖）。
+共 **13** 个绑定。由 CIM 自动生成，请勿手改（绑定变更后会覆盖）。
 
 文档目录：`docs/`（设置项 `cim.docsPath`）。
 
@@ -10,7 +10,6 @@
 | --- | --- | --- |
 | [`src/agent/scaffold.ts`](../src/agent/scaffold.ts) | [`docs/agent-scaffold.md`](./agent-scaffold.md) | file |
 | [`src/drift/driftChecker.ts`](../src/drift/driftChecker.ts) | [`docs/drift-checker.md`](./drift-checker.md) | file |
-| [`src/drift/driftChecker.ts`](../src/drift/driftChecker.ts) | [`docs/drift-checker copy.md`](./drift-checker copy.md) | file |
 | [`src/extension.ts`](../src/extension.ts) | [`docs/extension.md`](./extension.md) | file |
 | [`src/extension.ts`](../src/extension.ts) | [`docs/extension-activate.md`](./extension-activate.md) | range L15-58 (activate) |
 | [`src/store/frontmatter.ts`](../src/store/frontmatter.ts) | [`docs/store-frontmatter.md`](./store-frontmatter.md) | file |
