@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.7] - 2026-07-21
+
+### Fixed
+
+- CI 集成测试在无头 Ubuntu 上使用 `xvfb-run`（修复 Missing X server / DISPLAY）
+
 ## [0.1.6] - 2026-07-21
 
 ### Fixed
