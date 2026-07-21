@@ -30,3 +30,8 @@ test/
 ## CI
 
 `.github/workflows/ci.yml` 分别跑 unit 与 integration。
+
+- **unit**：纯 Node，无 GUI，直接跑即可  
+- **integration**：会下载并启动真实 VS Code（Electron）。GitHub `ubuntu-latest` 无显示器，必须用 `xvfb-run -a`，否则会出现 `Missing X server or $DISPLAY` 然后进程退出——这是环境问题，不是用例写错  
+
+本地有桌面时 `npm run test:integration` 一般可直接跑；无头 Linux 本地同样需要 xvfb。

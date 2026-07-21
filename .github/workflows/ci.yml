@@ -26,4 +26,6 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
-      - run: npm run test:integration
+      # @vscode/test-electron launches a real VS Code (Electron); headless runners need Xvfb.
+      - name: Integration tests
+        run: xvfb-run -a npm run test:integration
