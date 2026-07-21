@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.5] - 2026-07-21
+
+### Changed
+
+- 扩展 `name` / publisher 对齐为 `codebinddocs`（Marketplace 重发）
+
 ## [0.1.4] - 2026-07-21
 
 ### Changed

@@ -5,6 +5,8 @@ cbd:
   symbol: scaffoldAgentFiles
   contentHash: 2be3b6ea2174
 ---
+****
+
 # scaffold.ts
 
 ## 概述

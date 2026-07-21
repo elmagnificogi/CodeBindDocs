@@ -1,8 +1,8 @@
 {
-  "name": "codebind-docs",
-  "displayName": "CodeBind Docs",
-  "description": "旁路绑定代码文档：源码零侵入，Markdown + 分栏同步，本地可 Git，人与 Agent 共用设计上下文。",
-  "version": "0.1.4",
+  "name": "codebinddocs",
+  "displayName": "CodeBindDocs",
+  "description": "代码绑定文档：源码零侵入，Markdown + 分栏同步，本地可 Git，人与 Agent 共用设计上下文。",
+  "version": "0.1.5",
   "publisher": "codebinddocs",
   "license": "MIT",
   "icon": "media/icon.png",

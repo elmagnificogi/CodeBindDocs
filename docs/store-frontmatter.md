@@ -4,24 +4,23 @@ cbd:
   kind: file
   contentHash: b2b7af5229c5
 ---
-# frontmatter.ts
+* [ ]  ****
+
+# scaffold.ts
 
 ## 概述
 
-解析/序列化 Markdown 文件头中的 `cbd:` YAML，以及正文与文件头的拆分合并。
+`CBD: Initialize` 时写入 Agent 脚手架（若不存在则创建）：
 
-## API
+- 根目录 `AGENTS.md`
+- `.cursor/rules/cbd.mdc`
 
-- `parseCbdFrontmatter` / `serializeCbdFrontmatter`：读写绑定元数据
-- `splitMarkdown` / `joinMarkdown`：面板编辑时隐藏文件头、保存时拼回
-- `frontmatterToBinding` / `bindingToFrontmatter`：与 `Binding` 互转
+## 行为
 
-## 细节
-
-- 去 BOM；剥离正文里误嵌套的重复文件头（否则 IR 会显示成顶部「代码块」）
-- 序列化时若 body 仍以文件头开头会再剥一层，避免双重包裹
+- `writeIfMissing`：已有文件不覆盖，避免冲掉人工修改
+- 内容说明文档目录、`cbd-index.md`、文件头绑定与 Agent 阅读规则
 
 ## 约束
 
-- 绑定真相源在文档文件头，不在源码里
-- 正文示例尽量不要写裸的三连短横线围栏（易触发 Vditor 卡顿）
+- 脚手架只引导读 docs；不要求专用 Agent 格式
+- 更新模板后，已存在的 `AGENTS.md` / 规则文件需人工同步（本函数不会覆盖）
