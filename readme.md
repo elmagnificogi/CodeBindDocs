@@ -63,15 +63,29 @@
 cbd:
   target: src/foo.ts
   kind: file          # 或 range
-  startLine: 15       # range 时
-  endLine: 44
-  symbol: activate    # 强烈建议填写
-  contentHash: abc
+  startLine: 15       # 仅 range
+  endLine: 44         # 仅 range
+  symbol: activate    # range 强烈建议填
+  contentHash: abc    # 扩展维护，一般不用手改
 ---
 ```
 
-- **不修改**被绑定的源码文件  
+各字段含义：
+
+| 字段 | 必填 | 含义 |
+|------|------|------|
+| `target` | 是 | 绑定的源文件路径（相对工作区根，如 `src/foo.ts`） |
+| `kind` | 是 | `file` = 整文件；`range` = 某段代码块 |
+| `startLine` / `endLine` | `range` 时 | 代码块起止行号（1-based，含两端） |
+| `symbol` | `range` 强烈建议 | 该代码块对应的符号名（函数 / 类 / 方法等）。代码改动导致行号漂移时，可用 **按 symbol 重算行号** 自动更新 `startLine`/`endLine`；不填也能绑，但漂移后往往只能手动改绑 |
+| `contentHash` | 否（扩展写入） | 绑定内容的哈希，用于软提醒「源码可能已变、文档未必同步」；一般由扩展维护 |
+
+补充：
+
+- **不修改**被绑定的源码文件；真相源在文档头  
+- 同一源文件可有多个 `range`，至多一个 `file`；光标所在行优先匹配**最窄**的 `range`，否则回退到 `file`  
 - 无 `cbd:` 头的 Markdown 不算绑定（例如本仓库的 `REQUIREMENTS.md`）  
+- 新建 / 改绑代码块时，扩展会尽量从选区推断 `symbol`；留空需二次确认  
 
 ---
 
