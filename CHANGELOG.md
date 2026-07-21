@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.4] - 2026-07-21
+
+### Changed
+
+- Open VSX publisher 改为 `codebinddocs`（避免与现有命名空间冲突）
+
+## [0.1.3] - 2026-07-21
+
+### Changed
+
+- 精简 Marketplace README 产品简介文案
+
 ## [0.1.2] - 2026-07-19
 
 ### Changed
