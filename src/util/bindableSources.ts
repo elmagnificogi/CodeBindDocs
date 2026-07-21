@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { IndexStore } from '../store/indexStore';
 import { CbdIndex, normalizeRelPath } from '../store/types';
 
+/** Post-filter only — never a substitute for workspace files.exclude / search.exclude. */
 const SKIP_PREFIXES = [
   'node_modules/',
   'out/',
@@ -12,8 +13,6 @@ const SKIP_PREFIXES = [
 ];
 
 const SOURCE_GLOB = '**/*.{ts,tsx,js,jsx,mjs,cjs,py,go,rs,java,kt,cs}';
-const SOURCE_EXCLUDE =
-  '{**/node_modules/**,**/out/**,**/dist/**,**/.git/**,**/media/vditor/**,**/.vscode/**}';
 
 /** Whether a workspace-relative path is a reasonable bind target (not docs/skip). */
 export function isBindableSourceRel(rel: string, store: IndexStore): boolean {
@@ -21,7 +20,8 @@ export function isBindableSourceRel(rel: string, store: IndexStore): boolean {
   if (!norm || store.isUnderDocsPath(norm)) {
     return false;
   }
-  if (SKIP_PREFIXES.some((p) => norm.startsWith(p) || norm.includes('/' + p))) {
+  const lower = norm.toLowerCase();
+  if (SKIP_PREFIXES.some((p) => lower.startsWith(p) || lower.includes('/' + p))) {
     return false;
   }
   if (/\.(png|jpe?g|gif|webp|ico|woff2?|ttf|eot|map|vsix)$/i.test(norm)) {
@@ -42,7 +42,13 @@ export type CoverageReport = {
   total: number;
 };
 
-/** Scan workspace for bindable sources missing a CodeBind Docs binding. */
+/**
+ * Scan workspace for bindable sources missing a CodeBind Docs binding.
+ *
+ * Uses `findFiles(..., null)` so the workspace `files.exclude` / `search.exclude`
+ * apply (passing a custom exclude would override them). Project-specific junk
+ * dirs (Unity `Library/`, build outputs, …) belong in those settings — not hardcoded here.
+ */
 export async function scanBindingCoverage(
   store: IndexStore,
   index: CbdIndex
@@ -51,7 +57,7 @@ export async function scanBindingCoverage(
     index.bindings.map((b) => normalizeRelPath(b.target.path)).filter(Boolean)
   );
 
-  const uris = await vscode.workspace.findFiles(SOURCE_GLOB, SOURCE_EXCLUDE);
+  const uris = await vscode.workspace.findFiles(SOURCE_GLOB, null);
   const unbound: string[] = [];
   for (const uri of uris) {
     const rel = store.toWorkspaceRelative(uri);

@@ -22,6 +22,7 @@ CodeBind Docs 右侧文档面板：Vditor IR / 源码、主页、覆盖率、图
 ## 性能
 
 - 预拉 Vditor 静态资源；离屏预热；关 hljs
+- `localResourceRoots` 仅含扩展 `media/` + `docsPath` + `assetsPath`，**不挂整个工作区根**（Unity 等大仓挂根会导致面板创建极慢或看似无响应）
 
 ## 约束
 

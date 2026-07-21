@@ -147,6 +147,9 @@ cbd:
   await store.writeDocsIndex();
   treeProvider?.refresh();
   await driftChecker?.scanAll();
+  // Initialize does not change the active editor, so onDidChangeActiveTextEditor
+  // will not fire — force a sync so the unbound/bound pane appears immediately.
+  await splitSync?.syncNow();
   const extra =
     templatesWritten > 0
       ? ` 已写入 ${templatesWritten} 个默认模板到 \`${store.templatesPath}/\`。`

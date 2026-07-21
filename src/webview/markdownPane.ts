@@ -544,6 +544,20 @@ export class MarkdownPane {
       return;
     }
 
+    // Do NOT add the whole workspace root — Unity/.NET repos (Library/, etc.)
+    // make webview creation extremely slow or appear to hang. Docs + assets are enough.
+    const store = this.getStore();
+    const resourceRoots: vscode.Uri[] = [
+      vscode.Uri.joinPath(this.extensionUri, 'media'),
+    ];
+    if (store) {
+      resourceRoots.push(store.docsUri, store.assetsUri);
+    } else {
+      for (const folder of vscode.workspace.workspaceFolders ?? []) {
+        resourceRoots.push(folder.uri);
+      }
+    }
+
     this.panel = vscode.window.createWebviewPanel(
       'cbd.markdownPane',
       'CBD',
@@ -551,10 +565,7 @@ export class MarkdownPane {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.joinPath(this.extensionUri, 'media'),
-          ...(vscode.workspace.workspaceFolders?.map((f) => f.uri) ?? []),
-        ],
+        localResourceRoots: resourceRoots,
       }
     );
 

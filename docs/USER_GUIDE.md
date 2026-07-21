@@ -43,7 +43,7 @@ npm run package    # 生成 .vsix（需 vsce）
 - `AGENTS.md` — Agent 入口说明  
 - `.cursor/rules/cbd.mdc` — Cursor 规则（若适用）  
 
-可多次执行；已有文件会尽量保留。
+可多次执行；已有文件会尽量保留。完成后会立刻对当前源文件做一次分栏同步（有绑定打开文档，无绑定则出现「无关联文档」提示）。若面板仍未出现，可切换一下编辑器页签，或运行 **`CBD: Open Docs Index`**。
 
 ### 2.2 绑定第一个文件
 
@@ -199,6 +199,8 @@ heading: 概述
 | `cbd.docPane.outline` | `true` | IR 右侧大纲 |
 
 模板正文可用占位符 `{{title}}`。
+
+覆盖率 /「待绑定」扫描会走 VS Code 的 `findFiles`，并尊重工作区 **`files.exclude` / `search.exclude`**（不另写死项目目录）。Unity 等大仓请把 `Library/`、`Temp/` 等放进这些设置里（多数模板已有），否则扫全仓会很慢。
 
 ---
 

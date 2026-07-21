@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.6] - 2026-07-21
+
+### Fixed
+
+- Initialize 后立即分栏同步，避免未绑定/绑定面板不出现
+- 文档面板 `localResourceRoots` 不再挂整个工作区根（大仓如 Unity 下创建面板过慢）
+- 覆盖率扫描改用工作区 `files.exclude` / `search.exclude`，不再用自定义 exclude 覆盖
+
+### Added
+
+- GitHub Actions：打 `v*` tag 自动发布到 VS Marketplace 与 Open VSX
+
 ## [0.1.5] - 2026-07-21
 
 ### Changed
