@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.9] - 2026-07-22
+
+### Changed
+
+- README 快速开始补充 VS Marketplace / Open VSX 安装链接
+
 ## [0.1.8] - 2026-07-22
 
 ### Added

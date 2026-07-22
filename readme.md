@@ -36,7 +36,8 @@
 ---
 
 ## 快速开始
-
+- VS：[codebinddocs.codebinddocs](https://marketplace.visualstudio.com/items?itemName=codebinddocs.codebinddocs)
+- Cursor：[codebinddocs](https://open-vsx.org/extension/codebinddocs/codebinddocs)
 1. 安装本扩展后，打开任意工作区文件夹  
 2. 命令面板运行 **`CBD: Initialize`**（创建 `docs/`、`AGENTS.md` 等）  
 3. 打开一个源文件，运行 **`CBD: Bind Doc to Current File`**（整文件或代码块）  
