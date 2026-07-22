@@ -70,9 +70,14 @@ npm run package    # 生成 .vsix（需 vsce）
 
 ### 3.1 分栏同步
 
-- 默认开启：切换活动源文件时，右侧 CodeBind Docs 面板跟随  
-- 关闭：`CBD: Toggle Split Sync`，或设置 `cbd.splitSync.enabled`  
-- 无绑定时：右侧显示「无关联文档」，可一键新建（可用 `cbd.splitSync.promptWhenUnbound` 关闭提示）  
+- **自动分栏**（默认开）：切换活动源文件时，右侧 CodeBind Docs 面板跟随  
+  - 设置：`cbd.splitSync.enabled`  
+  - 或命令 / 快捷键：`CBD: Toggle Split Sync`（`Ctrl+Alt+Shift+D` / Mac `Cmd+Alt+Shift+D`）  
+- **关闭自动分栏**后：打开代码时不再强制弹文档窗；状态栏在有绑定时仍显示，可点；也可用一键打开  
+- **一键打开当前代码的绑定文档**：`CBD: Reveal Bound Doc`  
+  - 快捷键：`Ctrl+Alt+D`（Mac `Cmd+Alt+D`）  
+  - 无绑定时会提示并可新建  
+- 无绑定时（仅自动分栏开启）：右侧显示「无关联文档」，可一键新建（`cbd.splitSync.promptWhenUnbound`）  
 
 分栏位置：`cbd.splitSync.viewColumn` = `Beside`（默认）或 `Two`。
 
@@ -192,13 +197,20 @@ heading: 概述
 | `cbd.docsPath` | `docs` | 文档根目录（工作区相对路径） |
 | `cbd.assetsPath` | 空 → `{docsPath}/assets` | 图片等资源目录 |
 | `cbd.templatesPath` | 空 → `{docsPath}/_templates` | 新建模板；有 `.md` 则用磁盘模板 |
-| `cbd.splitSync.enabled` | `true` | 自动分栏同步 |
-| `cbd.splitSync.promptWhenUnbound` | `true` | 无绑定时显示新建入口 |
+| `cbd.splitSync.enabled` | `true` | 打开源文件时是否**自动**弹出绑定文档；关后用快捷键手动打开 |
+| `cbd.splitSync.promptWhenUnbound` | `true` | 自动分栏开启时，无绑定是否显示新建入口 |
 | `cbd.splitSync.viewColumn` | `Beside` | `Beside` 或 `Two` |
 | `cbd.docPane.mode` | `ir` | `ir` 即时渲染 / `source` 纯文本 |
 | `cbd.docPane.outline` | `true` | IR 右侧大纲 |
 
 模板正文可用占位符 `{{title}}`。
+
+快捷键（可在「键盘快捷方式」里改）：
+
+| 快捷键 | 命令 |
+|--------|------|
+| `Ctrl+Alt+D`（Mac `Cmd+Alt+D`） | 打开当前代码的绑定文档 |
+| `Ctrl+Alt+Shift+D`（Mac `Cmd+Alt+Shift+D`） | 开关自动分栏 |
 
 覆盖率 /「待绑定」扫描会走 VS Code 的 `findFiles`，并尊重工作区 **`files.exclude` / `search.exclude`**（不另写死项目目录）。Unity 等大仓请把 `Library/`、`Temp/` 等放进这些设置里（多数模板已有），否则扫全仓会很慢。
 
@@ -212,14 +224,14 @@ heading: 概述
 | `CBD: Bind Doc to Current File` | 为当前/指定源文件新建绑定 |
 | `CBD: Rebind Doc to Source` | 改绑到新源文件或新粒度 |
 | `CBD: Delete Bound Doc` | 删除绑定文档 |
-| `CBD: Reveal Bound Doc` | 打开当前文件的旁路文档 |
+| `CBD: Reveal Bound Doc` | 打开当前文件的旁路文档（`Ctrl+Alt+D`） |
 | `CBD: Reveal Source Range` | 从文档跳到源码选区 |
 | `CBD: Retighten Range by Symbol` | 按 symbol 重算行号 |
 | `CBD: Open Docs Index` | 打开文档主页 |
 | `CBD: Show Binding Drift` | 查看并处理漂移 |
 | `CBD: Refresh Doc contentHash` | 单篇标记已核对 |
 | `CBD: Refresh All contentHashes` | 全部标记已核对 |
-| `CBD: Toggle Split Sync` | 开关分栏同步 |
+| `CBD: Toggle Split Sync` | 开关自动分栏（`Ctrl+Alt+Shift+D`） |
 | `CBD: Refresh Doc Tree` | 刷新侧栏与漂移 |
 
 ---

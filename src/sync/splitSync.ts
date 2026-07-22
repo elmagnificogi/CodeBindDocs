@@ -29,7 +29,7 @@ export class SplitSync {
 
     this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
     this.statusBar.command = 'cbd.revealBoundDoc';
-    this.statusBar.tooltip = '打开当前文件的 CodeBind Docs 旁路文档';
+    this.statusBar.tooltip = '打开当前文件的 CodeBind Docs 旁路文档（Ctrl+Alt+D / Cmd+Alt+D）';
 
     this.disposables.push(
       this.pane,
@@ -192,8 +192,10 @@ export class SplitSync {
     editor: vscode.TextEditor | undefined,
     forceFocus: boolean
   ): Promise<void> {
-    if (!this.enabled || this.syncing || !editor) {
-      this.updateStatusBar(undefined);
+    if (this.syncing || !editor) {
+      if (!editor) {
+        this.updateStatusBar(undefined);
+      }
       return;
     }
     const store = this.getStore();
@@ -223,6 +225,10 @@ export class SplitSync {
     const forFile = store.findBindingsForTarget(index, rel);
     if (!forFile.length) {
       this.updateStatusBar(undefined);
+      // Auto-open off: do not create/steal a pane for unbound files.
+      if (!this.enabled) {
+        return;
+      }
       // Always leave the previous doc; otherwise switching package.json → package-lock.json
       // (and other skip-list files) keeps showing the old binding.
       await this.showUnbound(rel, forceFocus, shouldOfferBind(rel, store));
@@ -235,6 +241,15 @@ export class SplitSync {
       store.resolveBindingForLine(index, rel, line) ??
       forFile.find((b) => b.target.kind === 'file') ??
       forFile[0];
+
+    // Auto-open off: still refresh if the CBD pane is already visible; otherwise wait for
+    // revealBoundDoc / status bar / CodeLens.
+    if (!this.enabled) {
+      if (this.pane.isOpen) {
+        await this.openDoc(store, binding, forceFocus);
+      }
+      return;
+    }
 
     await this.openDoc(store, binding, forceFocus);
   }

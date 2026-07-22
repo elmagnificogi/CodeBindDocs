@@ -66,5 +66,6 @@ cbd:
 - `CBD: Delete Bound Doc` — 删除绑定文档（需确认）
 - `CBD: Show Binding Drift` — 查看绑定漂移并处理
 - `CBD: Refresh Doc contentHash` — 刷新文档内容哈希
-- `CBD: Reveal Bound Doc` — 打开当前文件的绑定文档
+- `CBD: Reveal Bound Doc` — 打开当前文件的绑定文档（`Ctrl+Alt+D`）
 - `CBD: Reveal Source Range` — 从文档跳到源码并选中绑定范围
+- `CBD: Toggle Split Sync` — 开关自动分栏（`Ctrl+Alt+Shift+D`；设置项 `cbd.splitSync.enabled`）

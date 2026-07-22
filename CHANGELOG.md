@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.8] - 2026-07-22
+
+### Added
+
+- 快捷键：`Ctrl+Alt+D` 一键打开当前代码绑定文档；`Ctrl+Alt+Shift+D` 开关自动分栏
+
+### Changed
+
+- 关闭 `cbd.splitSync.enabled` 后不再强制弹窗；有绑定时仍显示状态栏，面板已打开时继续跟随切换
+
 ## [0.1.7] - 2026-07-21
 
 ### Fixed

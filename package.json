@@ -2,7 +2,7 @@
   "name": "codebinddocs",
   "displayName": "CodeBindDocs",
   "description": "代码绑定文档：源码零侵入，Markdown + 分栏同步，本地可 Git，人与 Agent 共用设计上下文。",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "publisher": "codebinddocs",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -165,6 +165,19 @@
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "cbd.revealBoundDoc",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "cbd.toggleSplitSync",
+        "key": "ctrl+alt+shift+d",
+        "mac": "cmd+alt+shift+d"
+      }
+    ],
     "configuration": {
       "title": "CodeBind Docs",
       "properties": {
@@ -186,12 +199,12 @@
         "cbd.splitSync.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically open the bound Markdown doc in a side editor when switching source files."
+          "markdownDescription": "打开/切换源文件时是否**自动**在侧栏打开绑定文档（或未绑定提示）。关闭后不再强制弹窗；可用快捷键 `Ctrl+Alt+D`（macOS `Cmd+Alt+D`）或命令 **CBD: Reveal Bound Doc** 手动打开。也可用 **CBD: Toggle Split Sync**（`Ctrl+Alt+Shift+D`）切换。"
         },
         "cbd.splitSync.promptWhenUnbound": {
           "type": "boolean",
           "default": true,
-          "description": "When opening a source file with no CodeBind Docs binding, show the unbound pane with a create button."
+          "description": "When auto split-sync is on and the source file has no binding, show the unbound pane with a create button."
         },
         "cbd.splitSync.viewColumn": {
           "type": "string",

@@ -29,7 +29,7 @@ CodeBind Docs（简称 **CBD**）是 VS Code / Cursor 扩展：用**旁路绑定
 |------|------|
 | 初始化 | `CBD: Initialize` 创建文档目录、Agent 脚手架 |
 | 绑定 | 整文件或代码块（`kind: file \| range`）；新建时可选选区；光标进入块时切换文档 |
-| 分栏同步 | 活动编辑器切换时右侧打开绑定文档；**启动时对已恢复页签补同步**；无绑定提示新建 |
+| 分栏同步 | 可选自动（`cbd.splitSync.enabled`）或手动；快捷键打开当前绑定文档；启动时对已恢复页签补同步；无绑定可提示新建 |
 | 文档面板 | Vditor **即时渲染** + **文档源码**切换；YAML 头隐藏；标题旁不显示 H1/H2/H3 标签 |
 | 文档树 | Activity Bar：**已绑定** + **待绑定**；可打开源码/文档/新建绑定 |
 | CodeLens | 源码顶部「打开 CodeBind Docs 文档」+ range 行上打开代码块文档；状态栏 `CodeBind Docs 文档` |
@@ -156,14 +156,14 @@ heading: 概述
 | `CBD: Bind Doc to Current File` | 新建整文件/代码块绑定 |
 | `CBD: Rebind Doc to Source` | 失效或改绑（含代码块选区） |
 | `CBD: Delete Bound Doc` | 删除绑定文档（需确认） |
-| `CBD: Reveal Bound Doc` | 打开当前文件绑定文档 |
+| `CBD: Reveal Bound Doc` | 打开当前文件绑定文档（默认 `Ctrl+Alt+D`） |
 | `CBD: Reveal Source Range` | 从当前/指定文档跳到源码并选中绑定范围 |
 | `CBD: Retighten Range by Symbol` | 按 symbol 重算代码块 startLine/endLine |
 | `CBD: Open Docs Index` | 打开主页 / 汇总 |
 | `CBD: Show Binding Drift` | 查看并处理绑定漂移 |
 | `CBD: Refresh Doc contentHash` | 标记单篇文档已核对（更新哈希） |
 | `CBD: Refresh All contentHashes` | 全部标记已核对（可选，非强制） |
-| `CBD: Toggle Split Sync` | 开关分栏同步 |
+| `CBD: Toggle Split Sync` | 开关自动分栏（默认 `Ctrl+Alt+Shift+D`） |
 | `CBD: Refresh Doc Tree` | 刷新树与漂移 |
 
 ## Agent 集成

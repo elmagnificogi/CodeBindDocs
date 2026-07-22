@@ -409,7 +409,9 @@ async function revealBoundDoc(): Promise<void> {
 function toggleSplitSync(): void {
   const enabled = splitSync?.toggle() ?? false;
   void vscode.window.showInformationMessage(
-    enabled ? 'CBD: 分栏同步已开启' : 'CBD: 分栏同步已关闭'
+    enabled
+      ? 'CBD: 已开启自动分栏（打开源文件时显示绑定文档）。关闭：设置 cbd.splitSync.enabled，或再按 Ctrl+Alt+Shift+D'
+      : 'CBD: 已关闭自动分栏。可用 Ctrl+Alt+D（Mac: Cmd+Alt+D）一键打开当前文件的绑定文档'
   );
 }
 
