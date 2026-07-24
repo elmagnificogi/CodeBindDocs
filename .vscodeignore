@@ -3,6 +3,7 @@
 .github/**
 .cim/**
 .cursor/**
+.claude/**
 scripts/**
 test/**
 out-test/**
