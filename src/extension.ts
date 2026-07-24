@@ -15,6 +15,7 @@ import { applyDocTemplate, ensureDefaultTemplates, listDocTemplates } from './ut
 import { findOverlapsWithExisting } from './util/rangeOverlap';
 import { suggestSymbolInRange } from './util/suggestSymbol';
 import { isBindableDirectoryRel } from './util/bindableSources';
+import { checkAndOfferPathMigration, registerPathMigrationWatcher } from './store/pathMigration';
 
 let splitSync: SplitSync | undefined;
 let driftChecker: DriftChecker | undefined;
@@ -42,7 +43,8 @@ export function activate(context: vscode.ExtensionContext): void {
     splitSync,
     driftChecker,
     vscode.window.registerTreeDataProvider('cbd.bindings', treeProvider),
-    vscode.languages.registerCodeLensProvider({ scheme: 'file' }, codeLensProvider)
+    vscode.languages.registerCodeLensProvider({ scheme: 'file' }, codeLensProvider),
+    registerPathMigrationWatcher(getStore, context)
   );
 
   context.subscriptions.push(
@@ -86,7 +88,7 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
 
-  void bootstrap(getStore);
+  void bootstrap(getStore, context);
 }
 
 export function deactivate(): void {
@@ -97,9 +99,21 @@ export function deactivate(): void {
   codeLensProvider = undefined;
 }
 
-async function bootstrap(getStore: () => IndexStore | undefined): Promise<void> {
+async function bootstrap(
+  getStore: () => IndexStore | undefined,
+  context: vscode.ExtensionContext
+): Promise<void> {
   const store = getStore();
-  if (store && (await store.exists())) {
+  if (!store) {
+    return;
+  }
+  // Detect docsPath/assetsPath/templatesPath changes made while the extension wasn't
+  // running (e.g. hand-edited settings.json) and offer to move the old content over.
+  await checkAndOfferPathMigration(store, context, 'docsPath');
+  await checkAndOfferPathMigration(store, context, 'assetsPath');
+  await checkAndOfferPathMigration(store, context, 'templatesPath');
+
+  if (await store.exists()) {
     await store.writeDocsIndex();
     await driftChecker?.scanAll();
     treeProvider?.refresh();
