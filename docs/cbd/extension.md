@@ -3,7 +3,7 @@ cbd:
   target: src/extension.ts
   kind: file
   symbol: activate
-  contentHash: 22fdfb74518a
+  contentHash: ee2dd981ccf1
 ---
 # extension.ts
 

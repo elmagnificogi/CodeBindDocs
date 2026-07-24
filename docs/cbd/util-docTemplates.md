@@ -12,7 +12,7 @@ cbd:
 
 ## 配置
 
-- 设置项 **`cbd.templatesPath`**：工作区相对路径；留空 = `{docsPath}/_templates`（默认 `docs/_templates`）
+- 设置项 **`cbd.templatesPath`**：工作区相对路径；留空 = `{docsPath}/_templates`（默认 `docs/cbd/_templates`）
 - `CBD: Initialize` 或首次绑定时，若目录为空会写入默认 `design.md` / `api.md` / `minimal.md`
 
 ## 模板文件格式

@@ -1,6 +1,6 @@
 # CodeBind Docs 文档汇总
 
-共 **20** 个绑定。由 CodeBind Docs 自动生成，请勿手改（绑定变更后会覆盖）。
+共 **21** 个绑定。由 CodeBind Docs 自动生成，请勿手改（绑定变更后会覆盖）。
 
 文档目录：`docs/`（设置项 `cbd.docsPath`）。
 
@@ -14,6 +14,7 @@
 | [`src/extension.ts`](../src/extension.ts) | [`docs/extension-activate.md`](./extension-activate.md) | range L15-58 (activate) |
 | [`src/store/frontmatter.ts`](../src/store/frontmatter.ts) | [`docs/store-frontmatter.md`](./store-frontmatter.md) | file |
 | [`src/store/indexStore.ts`](../src/store/indexStore.ts) | [`docs/data-model.md`](./data-model.md) | file |
+| [`src/store/types copy.ts`](../src/store/types copy.ts) | [`docs/store-types copy.md`](./store-types copy.md) | file |
 | [`src/store/types.ts`](../src/store/types.ts) | [`docs/store-types.md`](./store-types.md) | file |
 | [`src/sync/splitSync.ts`](../src/sync/splitSync.ts) | [`docs/split-sync.md`](./split-sync.md) | file |
 | [`src/util/bindableSources.ts`](../src/util/bindableSources.ts) | [`docs/util-bindableSources.md`](./util-bindableSources.md) | file |

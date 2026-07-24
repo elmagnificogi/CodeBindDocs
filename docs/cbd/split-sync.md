@@ -3,7 +3,7 @@ cbd:
   target: src/sync/splitSync.ts
   kind: file
   symbol: SplitSync
-  contentHash: 66dca202ff37
+  contentHash: 2e8aac68e812
 ---
 # splitSync.ts
 

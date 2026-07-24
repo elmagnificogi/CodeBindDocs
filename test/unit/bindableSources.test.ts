@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { isBindableSourceRel } from '../../src/util/bindableSources';
+import { isBindableDirectoryRel, isBindableSourceRel } from '../../src/util/bindableSources';
 import { IndexStore } from '../../src/store/indexStore';
 
 suite('bindableSources', () => {
@@ -21,5 +21,18 @@ suite('bindableSources', () => {
     assert.strictEqual(isBindableSourceRel('media/vditor/dist/index.js', store), false);
     assert.strictEqual(isBindableSourceRel('icon.png', store), false);
     assert.strictEqual(isBindableSourceRel('package-lock.json', store), false);
+  });
+
+  test('isBindableDirectoryRel accepts normal source folders', () => {
+    assert.strictEqual(isBindableDirectoryRel('src/util', store), true);
+    assert.strictEqual(isBindableDirectoryRel('src', store), true);
+  });
+
+  test('isBindableDirectoryRel rejects docs and skip-prefix folders', () => {
+    assert.strictEqual(isBindableDirectoryRel('docs', store), false);
+    assert.strictEqual(isBindableDirectoryRel('docs/sub', store), false);
+    assert.strictEqual(isBindableDirectoryRel('node_modules', store), false);
+    assert.strictEqual(isBindableDirectoryRel('.git', store), false);
+    assert.strictEqual(isBindableDirectoryRel('', store), false);
   });
 });

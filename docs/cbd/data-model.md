@@ -10,7 +10,7 @@ cbd:
 ## 目录布局
 
 ```text
-docs/                 # 默认文档目录（cbd.docsPath）
+docs/cbd/             # 默认文档目录（cbd.docsPath）
   *.md                # 带 cbd: 文件头的绑定文档
   cbd-index.md        # 自动生成的汇总
   assets/             # 可选媒体（cbd.assetsPath 可覆盖；粘贴图片自动落入）
@@ -20,7 +20,7 @@ docs/REQUIREMENTS.md  # 普通文档（无 cbd: 头，不算绑定）
 
 ## 配置
 
-- `cbd.docsPath`：文档根目录，默认 `docs`
+- `cbd.docsPath`：文档根目录，默认 `docs/cbd`
 - `cbd.assetsPath`：资源目录，空则 `{docsPath}/assets`
 - `cbd.templatesPath`：新建文档模板目录，空则 `{docsPath}/_templates`
 

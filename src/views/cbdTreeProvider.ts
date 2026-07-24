@@ -58,12 +58,18 @@ export class BindingItem extends vscode.TreeItem {
       this.description = `${binding.doc}  L${binding.target.startLine}-${binding.target.endLine}${
         sym ? ` · ${sym}` : ''
       }`;
+    } else if (binding.target.kind === 'directory') {
+      this.description = `${binding.doc}（目录）`;
     } else {
       this.description = binding.doc;
     }
     this.tooltip = `${binding.target.path} → ${binding.doc}`;
     this.iconPath = new vscode.ThemeIcon(
-      binding.target.kind === 'range' ? 'symbol-method' : 'link'
+      binding.target.kind === 'range'
+        ? 'symbol-method'
+        : binding.target.kind === 'directory'
+          ? 'folder'
+          : 'link'
     );
     this.command = {
       command: 'cbd.openTarget',

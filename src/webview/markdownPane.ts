@@ -56,6 +56,8 @@ type HostToWeb =
       type: 'unbound';
       sourceRel: string;
       canCreate: boolean;
+      /** Directory binding covering this file's folder, if any — offers a quick-open shortcut. */
+      dirDoc?: { doc: string; dirPath: string };
       canBack: boolean;
       canForward: boolean;
     }
@@ -133,6 +135,7 @@ export class MarkdownPane {
   private currentUri: vscode.Uri | undefined;
   private unboundSourceRel: string | undefined;
   private unboundCanCreate = true;
+  private unboundDirDoc: { doc: string; dirPath: string } | undefined;
   private viewingHome = false;
   private viewingCoverage = false;
   private header: string | undefined;
@@ -275,7 +278,8 @@ export class MarkdownPane {
     sourceRel: string,
     column: vscode.ViewColumn,
     forceFocus: boolean,
-    canCreate = true
+    canCreate = true,
+    dirDoc?: { doc: string; dirPath: string }
   ): Promise<void> {
     const col = this.stayColumn(column);
     if (
@@ -297,6 +301,7 @@ export class MarkdownPane {
     this.viewingCoverage = false;
     this.unboundSourceRel = sourceRel;
     this.unboundCanCreate = canCreate;
+    this.unboundDirDoc = dirDoc;
     await this.ensurePanel(col, !forceFocus);
 
     if (!this.navigatingHistory) {
@@ -308,6 +313,7 @@ export class MarkdownPane {
       type: 'unbound',
       sourceRel,
       canCreate,
+      dirDoc,
       ...this.navFlags(),
     } satisfies HostToWeb);
     if (forceFocus) {
@@ -407,6 +413,7 @@ export class MarkdownPane {
         type: 'unbound',
         sourceRel: this.unboundSourceRel,
         canCreate: this.unboundCanCreate,
+        dirDoc: this.unboundDirDoc,
         ...this.navFlags(),
       } satisfies HostToWeb);
     } else if (this.currentUri) {
@@ -582,6 +589,7 @@ export class MarkdownPane {
             type: 'unbound',
             sourceRel: this.unboundSourceRel,
             canCreate: this.unboundCanCreate,
+            dirDoc: this.unboundDirDoc,
             ...this.navFlags(),
           } satisfies HostToWeb);
         } else {
@@ -1197,7 +1205,9 @@ export class MarkdownPane {
   <div id="unbound" class="center">
     <h2>无关联文档</h2>
     <p>当前文件 <code id="unboundPath"></code> 尚未绑定 CodeBind Docs 文档。</p>
+    <p id="unboundDirHint" class="hidden-mode">所在目录 <code id="unboundDirPath"></code> 有说明文档：<code id="unboundDirDocName"></code></p>
     <button type="button" class="cta primary" id="btnCreate">新建关联文档</button>
+    <button type="button" class="cta" id="btnOpenDirDoc" style="display:none">打开目录文档</button>
   </div>
   <script src="${vditorJs}"></script>
   <script>
@@ -1215,6 +1225,10 @@ export class MarkdownPane {
     const coveragePageEl = document.getElementById('coveragePage');
     const unboundEl = document.getElementById('unbound');
     const unboundPath = document.getElementById('unboundPath');
+    const unboundDirHint = document.getElementById('unboundDirHint');
+    const unboundDirPath = document.getElementById('unboundDirPath');
+    const unboundDirDocName = document.getElementById('unboundDirDocName');
+    const btnOpenDirDoc = document.getElementById('btnOpenDirDoc');
     const btnCreate = document.getElementById('btnCreate');
     const docList = document.getElementById('docList');
     const missingSection = document.getElementById('missingSection');
@@ -1286,6 +1300,7 @@ export class MarkdownPane {
     let applying = false;
     let pendingMarkdown = '';
     let unboundSourceRel = '';
+    let unboundDirDocRel = '';
     let currentDocRel = '';
     let sourceJump = null;
 
@@ -1358,7 +1373,7 @@ export class MarkdownPane {
       else warmTimer = setTimeout(run, 80);
     }
 
-    function showUnbound(sourceRel, canBack, canForward, canCreate) {
+    function showUnbound(sourceRel, canBack, canForward, canCreate, dirDoc) {
       hideAll();
       unboundSourceRel = sourceRel || '';
       currentDocRel = '';
@@ -1371,6 +1386,17 @@ export class MarkdownPane {
       hint.textContent = allowCreate
         ? '无关联文档 · 可新建绑定或返回主页'
         : '无关联文档 · 此类文件默认不提示新建绑定';
+      if (dirDoc && dirDoc.doc) {
+        unboundDirDocRel = dirDoc.doc;
+        unboundDirPath.textContent = (dirDoc.dirPath || '') + '/';
+        unboundDirDocName.textContent = dirDoc.doc;
+        unboundDirHint.classList.remove('hidden-mode');
+        btnOpenDirDoc.style.display = '';
+      } else {
+        unboundDirDocRel = '';
+        unboundDirHint.classList.add('hidden-mode');
+        btnOpenDirDoc.style.display = 'none';
+      }
       setNav(canBack, canForward);
       scheduleWarmIr(false);
     }
@@ -2034,6 +2060,10 @@ export class MarkdownPane {
       scheduleWarmIr(true);
       vscodeApi.postMessage({ type: 'createBind', sourceRel: unboundSourceRel });
     });
+    btnOpenDirDoc.addEventListener('click', function () {
+      if (!unboundDirDocRel) return;
+      vscodeApi.postMessage({ type: 'openDoc', docRel: unboundDirDocRel });
+    });
     btnHome.addEventListener('click', function () {
       vscodeApi.postMessage({ type: 'navHome' });
     });
@@ -2060,7 +2090,7 @@ export class MarkdownPane {
         return;
       }
       if (msg.type === 'unbound') {
-        showUnbound(msg.sourceRel || '', msg.canBack, msg.canForward, msg.canCreate !== false);
+        showUnbound(msg.sourceRel || '', msg.canBack, msg.canForward, msg.canCreate !== false, msg.dirDoc || null);
         return;
       }
       if (msg.type === 'assetSaved') {

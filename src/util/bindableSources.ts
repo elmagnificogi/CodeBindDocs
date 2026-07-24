@@ -33,6 +33,19 @@ export function isBindableSourceRel(rel: string, store: IndexStore): boolean {
   return true;
 }
 
+/** Whether a workspace-relative folder is a reasonable directory-binding target. */
+export function isBindableDirectoryRel(rel: string, store: IndexStore): boolean {
+  const norm = normalizeRelPath(rel);
+  if (!norm || store.isUnderDocsPath(norm)) {
+    return false;
+  }
+  const lower = norm.toLowerCase() + '/';
+  if (SKIP_PREFIXES.some((p) => lower.startsWith(p) || lower.includes('/' + p))) {
+    return false;
+  }
+  return true;
+}
+
 export type CoverageReport = {
   /** Distinct source paths that have at least one binding. */
   boundCount: number;

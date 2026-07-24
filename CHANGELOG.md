@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.10] - 2026-07-24
+
+### Added
+
+- 目录绑定（`cbd.kind: directory`）：可将文档绑定到整个目录，统一说明其下代码；支持 `CBD: Bind Doc to Folder`（资源管理器右键文件夹 / 命令面板文件夹选择器），侧栏树用文件夹图标展示，`cbd-index.md` 显示 `directory` 类型；未单独绑定文件所在目录若有说明文档，分屏「无关联文档」页会带快捷入口
+- 漂移检测对目录绑定仅检查目录是否存在（不做内容哈希）
+
+### Changed
+
+- **`cbd.docsPath` 默认值由 `docs` 改为 `docs/cbd`**（新工作区默认把 CBD 管理的文档放进独立子目录，避免和其它项目文档混在一起）；已有工作区如需保留旧路径，可在设置里把 `cbd.docsPath` 改回 `docs`
+- 扩展改用 esbuild 打包为单文件 `out/extension.js`（原为 tsc 逐文件输出），加快扩展宿主启动
+- `vditor` 从 `dependencies` 移到 `devDependencies`（仅构建期用于拷贝 webview 静态资源，运行时从未被引入）
+
 ## [0.1.9] - 2026-07-22
 
 ### Changed

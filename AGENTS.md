@@ -4,11 +4,11 @@
 
 ## 布局
 
-- 文档目录由设置 `cbd.docsPath` 决定，**默认 `docs/`**
-- `docs/*.md` — 设计文档；**绑定写在 Markdown YAML 文件头**
-- `docs/cbd-index.md` — 全部绑定的汇总目录（自动生成）
-- `docs/assets/` — 可选媒体（可用 `cbd.assetsPath` 覆盖）
-- `docs/_templates/` — 新建文档模板（可用 `cbd.templatesPath` 覆盖；支持 `{{title}}`）
+- 文档目录由设置 `cbd.docsPath` 决定，**默认 `docs/cbd/`**
+- `docs/cbd/*.md` — 设计文档；**绑定写在 Markdown YAML 文件头**
+- `docs/cbd/cbd-index.md` — 全部绑定的汇总目录（自动生成）
+- `docs/cbd/assets/` — 可选媒体（可用 `cbd.assetsPath` 覆盖）
+- `docs/cbd/_templates/` — 新建文档模板（可用 `cbd.templatesPath` 覆盖；支持 `{{title}}`）
 - `docs/REQUIREMENTS.md` — 产品需求（无绑定头）
 - `docs/USER_GUIDE.md` — **最终用户使用说明**（安装、绑定、漂移、设置）
 - `docs/DEVELOPMENT.md` — 扩展开发与调试

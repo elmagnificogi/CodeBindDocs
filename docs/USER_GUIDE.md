@@ -194,7 +194,7 @@ heading: 概述
 
 | 设置 | 默认 | 说明 |
 |------|------|------|
-| `cbd.docsPath` | `docs` | 文档根目录（工作区相对路径） |
+| `cbd.docsPath` | `docs/cbd` | 文档根目录（工作区相对路径） |
 | `cbd.assetsPath` | 空 → `{docsPath}/assets` | 图片等资源目录 |
 | `cbd.templatesPath` | 空 → `{docsPath}/_templates` | 新建模板；有 `.md` 则用磁盘模板 |
 | `cbd.splitSync.enabled` | `true` | 打开源文件时是否**自动**弹出绑定文档；关后用快捷键手动打开 |

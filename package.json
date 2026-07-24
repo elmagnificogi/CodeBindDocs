@@ -2,7 +2,7 @@
   "name": "codebinddocs",
   "displayName": "CodeBindDocs",
   "description": "代码绑定文档：源码零侵入，Markdown + 分栏同步，本地可 Git，人与 Agent 共用设计上下文。",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "publisher": "codebinddocs",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -50,6 +50,10 @@
       {
         "command": "cbd.bindCurrentFile",
         "title": "CBD: Bind Doc to Current File"
+      },
+      {
+        "command": "cbd.bindCurrentFolder",
+        "title": "CBD: Bind Doc to Folder"
       },
       {
         "command": "cbd.revealBoundDoc",
@@ -125,6 +129,13 @@
       ]
     },
     "menus": {
+      "explorer/context": [
+        {
+          "command": "cbd.bindCurrentFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "cbd"
+        }
+      ],
       "view/title": [
         {
           "command": "cbd.openDocsIndex",
@@ -183,8 +194,8 @@
       "properties": {
         "cbd.docsPath": {
           "type": "string",
-          "default": "docs",
-          "description": "Workspace-relative folder for CodeBind Docs Markdown docs (bindings via YAML frontmatter). Default: docs"
+          "default": "docs/cbd",
+          "description": "Workspace-relative folder for CodeBind Docs Markdown docs (bindings via YAML frontmatter). Default: docs/cbd"
         },
         "cbd.assetsPath": {
           "type": "string",
@@ -237,9 +248,10 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./ && node scripts/copy-vditor.js",
+    "typecheck": "tsc --noEmit -p ./",
+    "compile": "npm run typecheck && node scripts/esbuild.js && node scripts/copy-vditor.js",
     "compile:test": "tsc -p tsconfig.test.json",
-    "watch": "tsc -watch -p ./",
+    "watch": "node scripts/esbuild.js --watch",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package --no-dependencies",
     "publish:vsce": "vsce publish --no-dependencies",
@@ -257,12 +269,11 @@
     "@types/vscode": "^1.85.0",
     "@vscode/test-electron": "^2.4.1",
     "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.28.1",
     "glob": "^11.0.1",
     "mocha": "^11.1.0",
     "ovsx": "^0.10.4",
-    "typescript": "^5.3.3"
-  },
-  "dependencies": {
+    "typescript": "^5.3.3",
     "vditor": "^3.11.2"
   }
 }

@@ -46,10 +46,10 @@ CodeBind Docs（简称 **CBD**）是 VS Code / Cursor 扩展：用**旁路绑定
 
 ## 数据模型
 
-文档目录由 **`cbd.docsPath`** 配置，**默认 `docs/`**：
+文档目录由 **`cbd.docsPath`** 配置，**默认 `docs/cbd/`**：
 
 ```text
-docs/
+docs/cbd/
   *.md              # 带 cbd: 文件头的绑定文档
   cbd-index.md      # 自动生成的汇总（勿手改）
   assets/           # 可选媒体（cbd.assetsPath 可改）
@@ -136,7 +136,7 @@ heading: 概述
 3. 若选代码块：打开源文件；用**状态栏**「确认代码块选区 / 取消」（**非模态**，可正常拖选代码）；**强烈建议填 symbol**（可自动推断，留空需确认）
 4. 更新 `cbd.target` / `kind` / 行号 / `contentHash`，并打开该文档
 
-新建代码块绑定同样走状态栏确认选区，禁止用模态对话框挡住编辑器。新建时可选择文档模板（目录 `cbd.templatesPath`，默认 `docs/_templates/`，正文可用 `{{title}}`）。若新 range 与已有绑定重叠，会二次确认。
+新建代码块绑定同样走状态栏确认选区，禁止用模态对话框挡住编辑器。新建时可选择文档模板（目录 `cbd.templatesPath`，默认 `docs/cbd/_templates/`，正文可用 `{{title}}`）。若新 range 与已有绑定重叠，会二次确认。
 
 保存已绑定源文件且检测到符号位移/行范围失效时，弹窗**优先**提供「按 symbol 重算行号」。
 允许：代码块 ↔ 整文件 互相改绑。

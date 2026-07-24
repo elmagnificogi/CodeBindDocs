@@ -109,7 +109,8 @@ function parseCbdYaml(yaml: string): CbdFrontmatter | undefined {
     return undefined;
   }
 
-  const kind: BindingKind = values.kind === 'range' ? 'range' : 'file';
+  const kind: BindingKind =
+    values.kind === 'range' ? 'range' : values.kind === 'directory' ? 'directory' : 'file';
   const meta: CbdFrontmatter = {
     target: normalizeRelPath(target),
     kind,

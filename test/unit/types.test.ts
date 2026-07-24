@@ -12,4 +12,14 @@ suite('types', () => {
     assert.strictEqual(idx.version, 1);
     assert.deepStrictEqual(idx.bindings, []);
   });
+
+  test('BindingKind accepts directory', () => {
+    const idx = emptyIndex();
+    idx.bindings.push({
+      id: 'docs/util-README.md',
+      doc: 'docs/util-README.md',
+      target: { path: 'src/util', kind: 'directory' },
+    });
+    assert.strictEqual(idx.bindings[0].target.kind, 'directory');
+  });
 });

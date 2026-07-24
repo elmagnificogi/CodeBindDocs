@@ -79,6 +79,31 @@ cbd:
     assert.strictEqual(meta?.contentHash, 'deadbeef');
   });
 
+  test('parseCbdFrontmatter reads directory kind', () => {
+    const md = `---
+cbd:
+  target: src/util
+  kind: directory
+---
+# Dir doc
+`;
+    const { meta } = parseCbdFrontmatter(md);
+    assert.strictEqual(meta?.target, 'src/util');
+    assert.strictEqual(meta?.kind, 'directory');
+    assert.strictEqual(meta?.startLine, undefined);
+  });
+
+  test('directory kind round-trips through serialize/parse without line fields', () => {
+    const md = serializeCbdFrontmatter(
+      { target: 'src/util', kind: 'directory' },
+      '# Dir doc\n'
+    );
+    const { meta } = parseCbdFrontmatter(md);
+    assert.strictEqual(meta?.kind, 'directory');
+    assert.strictEqual(meta?.startLine, undefined);
+    assert.strictEqual(meta?.endLine, undefined);
+  });
+
   test('bindingToFrontmatter / frontmatterToBinding round-trip', () => {
     const binding: Binding = {
       id: 'docs/x.md',

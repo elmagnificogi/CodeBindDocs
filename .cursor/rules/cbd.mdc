@@ -9,8 +9,8 @@ alwaysApply: false
 
 本项目用 CodeBind Docs 把设计文档放在源码旁：
 
-- 文档目录：`cbd.docsPath`（默认 `docs/`）
-- 汇总：`docs/cbd-index.md`（自动生成）
+- 文档目录：`cbd.docsPath`（默认 `docs/cbd/`）
+- 汇总：`docs/cbd/cbd-index.md`（自动生成）
 - 绑定：每个 Markdown 文件头的 YAML `cbd.target`
 - 模块对照表见根目录 `AGENTS.md`
 

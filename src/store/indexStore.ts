@@ -14,7 +14,7 @@ import {
 } from './types';
 
 /** Default workspace-relative docs folder (configurable via `cbd.docsPath`). */
-export const DEFAULT_DOCS_PATH = 'docs';
+export const DEFAULT_DOCS_PATH = 'docs/cbd';
 /** Auto-generated overview filename inside the docs folder. */
 export const INDEX_FILE_NAME = 'cbd-index.md';
 
@@ -245,7 +245,7 @@ export class IndexStore {
     for (const b of index.bindings) {
       const srcLink = relativeMarkdownLink(indexPath, b.target.path);
       const docLink = relativeMarkdownLink(indexPath, b.doc);
-      let kind = b.target.kind === 'range' ? 'range' : 'file';
+      let kind = b.target.kind === 'range' ? 'range' : b.target.kind === 'directory' ? 'directory' : 'file';
       if (
         b.target.kind === 'range' &&
         typeof b.target.startLine === 'number' &&
@@ -327,6 +327,27 @@ export class IndexStore {
   }
 
   /**
+   * Find the most specific directory binding covering `rel` (itself or an ancestor).
+   * Nested directory bindings resolve to the deepest (longest path) match.
+   */
+  findDirectoryBindingForRel(index: CbdIndex, rel: string): Binding | undefined {
+    const norm = normalizeRelPath(rel);
+    const candidates = index.bindings.filter((b) => {
+      if (b.target.kind !== 'directory') {
+        return false;
+      }
+      const dir = normalizeRelPath(b.target.path);
+      return dir === norm || norm.startsWith(dir + '/');
+    });
+    if (!candidates.length) {
+      return undefined;
+    }
+    return candidates.sort(
+      (a, b) => normalizeRelPath(b.target.path).length - normalizeRelPath(a.target.path).length
+    )[0];
+  }
+
+  /**
    * Prefer the tightest range covering `line1Based`, else file-level binding.
    */
   resolveBindingForLine(
@@ -373,12 +394,13 @@ export class IndexStore {
   }
 
   /** Suggest a workspace-relative doc path under docsPath. */
-  suggestDocPath(targetRel: string): string {
+  suggestDocPath(targetRel: string, opts?: { directory?: boolean }): string {
     const base = targetRel
       .replace(/^src\//, '')
       .replace(/\.[^.]+$/, '')
       .replace(/\//g, '-');
-    return `${this.docsPath}/${base || 'untitled'}.md`;
+    const suffix = opts?.directory ? '-README' : '';
+    return `${this.docsPath}/${base || 'untitled'}${suffix}.md`;
   }
 
   async createDocIfMissing(

@@ -1,4 +1,4 @@
-export type BindingKind = 'file' | 'range';
+export type BindingKind = 'file' | 'range' | 'directory';
 
 export interface BindingTarget {
   /** Path relative to workspace root, using forward slashes. */

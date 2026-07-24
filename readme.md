@@ -57,7 +57,7 @@
 
 ## 绑定长什么样
 
-文档目录默认 `docs/`（可用设置 `cbd.docsPath` 修改）。绑定写在 Markdown **文件头**：
+文档目录默认 `docs/cbd/`（可用设置 `cbd.docsPath` 修改）。绑定写在 Markdown **文件头**：
 
 ```yaml
 ---

@@ -125,6 +125,11 @@ export class DriftChecker {
         continue;
       }
 
+      if (binding.target.kind === 'directory') {
+        // No single-content anchor for a directory — existence is checked above.
+        continue;
+      }
+
       const hashIssues = await this.checkAnchors(store, binding, targetUri);
       found.push(...hashIssues);
     }
@@ -720,6 +725,10 @@ export async function refreshBindingHash(
   store: IndexStore,
   binding: Binding
 ): Promise<void> {
+  if (binding.target.kind === 'directory') {
+    // Directories have no single content to hash.
+    return;
+  }
   const targetUri = store.targetUri(binding.target.path);
   const hash = await store.hashFileContent(targetUri);
   if (!binding.anchors?.length) {

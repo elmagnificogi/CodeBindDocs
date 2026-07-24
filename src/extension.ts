@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { scaffoldAgentFiles } from './agent/scaffold';
 import { DriftChecker, refreshBindingHash } from './drift/driftChecker';
 import { getWorkspaceStore, IndexStore } from './store/indexStore';
-import { Binding, normalizeRelPath } from './store/types';
+import { Binding, BindingAnchor, BindingKind, BindingTarget, normalizeRelPath } from './store/types';
 import { SplitSync } from './sync/splitSync';
 import { BindingItem, CbdTreeProvider } from './views/cbdTreeProvider';
 import { CbdCodeLensProvider } from './views/cbdCodeLens';
@@ -14,6 +14,7 @@ import {
 import { applyDocTemplate, ensureDefaultTemplates, listDocTemplates } from './util/docTemplates';
 import { findOverlapsWithExisting } from './util/rangeOverlap';
 import { suggestSymbolInRange } from './util/suggestSymbol';
+import { isBindableDirectoryRel } from './util/bindableSources';
 
 let splitSync: SplitSync | undefined;
 let driftChecker: DriftChecker | undefined;
@@ -48,6 +49,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('cbd.initialize', () => initialize(getStore)),
     vscode.commands.registerCommand('cbd.bindCurrentFile', (sourceRel?: string) =>
       bindCurrentFile(getStore, sourceRel)
+    ),
+    vscode.commands.registerCommand('cbd.bindCurrentFolder', (uri?: vscode.Uri) =>
+      bindCurrentFolder(getStore, uri)
     ),
     vscode.commands.registerCommand('cbd.revealBoundDoc', () => revealBoundDoc()),
     vscode.commands.registerCommand('cbd.toggleSplitSync', () => toggleSplitSync()),
@@ -198,6 +202,18 @@ async function bindCurrentFile(
     return;
   }
 
+  try {
+    const stat = await vscode.workspace.fs.stat(sourceUri);
+    if (stat.type === vscode.FileType.Directory) {
+      void vscode.window.showErrorMessage(
+        'CBD: 这是一个文件夹，请使用「CBD: Bind Doc to Folder」命令绑定目录。'
+      );
+      return;
+    }
+  } catch {
+    // Missing file: let the existing downstream flow surface its own error.
+  }
+
   await store.ensureLayout();
   await scaffoldAgentFiles(store.workspaceFolder.uri);
   // Ensure editable templates exist before the user picks one.
@@ -315,9 +331,98 @@ async function bindCurrentFile(
       ? `${baseSuggest}-${symbol || `L${startLine}-${endLine}`}.md`
       : `${baseSuggest}.md`;
 
+  const title =
+    kindPick.bindKind === 'range'
+      ? `${rel.split('/').pop()} ${symbol ?? `L${startLine}-${endLine}`}`
+      : (rel.split('/').pop() ?? rel);
+  const hash = await store.hashFileContent(sourceUri);
+  const scope = kindPick.bindKind === 'range' ? `L${startLine}-${endLine}` : '整文件';
+
+  await pickDocPathAndWrite(
+    store,
+    suggested,
+    title,
+    { path: rel, kind: kindPick.bindKind, startLine, endLine },
+    [{ contentHash: hash, symbol }],
+    scope
+  );
+}
+
+async function bindCurrentFolder(
+  getStore: () => IndexStore | undefined,
+  uriArg?: vscode.Uri
+): Promise<void> {
+  const store = getStore();
+  if (!store) {
+    void vscode.window.showErrorMessage('CBD: 请先打开一个工作区文件夹。');
+    return;
+  }
+
+  let folderUri = uriArg;
+  if (!folderUri) {
+    const picked = await vscode.window.showOpenDialog({
+      canSelectMany: false,
+      canSelectFiles: false,
+      canSelectFolders: true,
+      openLabel: '选择要绑定的文件夹',
+      defaultUri: store.workspaceFolder.uri,
+    });
+    if (!picked?.length) {
+      return;
+    }
+    folderUri = picked[0];
+  }
+
+  const rel = store.toWorkspaceRelative(folderUri);
+  if (!rel) {
+    void vscode.window.showErrorMessage('CBD: 文件夹不在工作区内。');
+    return;
+  }
+  if (!isBindableDirectoryRel(rel, store)) {
+    void vscode.window.showErrorMessage(`CBD: 不能绑定该目录（${rel}）。`);
+    return;
+  }
+
+  await store.ensureLayout();
+  await scaffoldAgentFiles(store.workspaceFolder.uri);
+  await ensureDefaultTemplates(store);
+  void splitSync?.warmEditor();
+
+  store.invalidateCache();
+  const index = await store.read();
+  const existing = store
+    .findBindingsForTarget(index, rel)
+    .find((b) => b.target.kind === 'directory');
+  if (existing) {
+    const choice = await vscode.window.showInformationMessage(
+      `该目录已有绑定：${existing.doc}。打开？`,
+      '打开'
+    );
+    if (choice === '打开') {
+      await splitSync?.openDocUri(store.docUri(existing.doc), true);
+    }
+    return;
+  }
+
+  const baseSuggest = store.suggestDocPath(rel, { directory: true }).replace(/\.md$/, '');
+  const suggested = `${baseSuggest}.md`;
+  const title = `${rel.split('/').pop() ?? rel}/`;
+
+  await pickDocPathAndWrite(store, suggested, title, { path: rel, kind: 'directory' }, [], '整个目录');
+}
+
+/** Shared tail of the bind flows: pick a doc path + template, write the binding, open it. */
+async function pickDocPathAndWrite(
+  store: IndexStore,
+  suggestedDocRel: string,
+  title: string,
+  target: BindingTarget,
+  anchors: BindingAnchor[],
+  scopeLabel: string
+): Promise<void> {
   const docRel = await vscode.window.showInputBox({
     prompt: `新建关联文档路径（工作区相对，默认在 ${store.docsPath}/）`,
-    value: suggested,
+    value: suggestedDocRel,
     validateInput: (v) => (v.trim() ? undefined : '路径必填'),
   });
   if (!docRel) {
@@ -340,21 +445,11 @@ async function bindCurrentFile(
     return;
   }
 
-  const title =
-    kindPick.bindKind === 'range'
-      ? `${rel.split('/').pop()} ${symbol ?? `L${startLine}-${endLine}`}`
-      : (rel.split('/').pop() ?? rel);
-  const hash = await store.hashFileContent(sourceUri);
   const binding: Binding = {
     id: normalizeRelPath(docRel.trim()),
-    target: {
-      path: rel,
-      kind: kindPick.bindKind,
-      startLine,
-      endLine,
-    },
+    target,
     doc: docRel.trim().replace(/\\/g, '/'),
-    anchors: [{ contentHash: hash, symbol }],
+    anchors,
   };
 
   // One write + open first; index/scan in background so the pane can paint immediately.
@@ -372,9 +467,9 @@ async function bindCurrentFile(
   }
 
   await splitSync?.openDocUri(store.docUri(binding.doc), true);
-  const scope =
-    kindPick.bindKind === 'range' ? `L${startLine}-${endLine}` : '整文件';
-  void vscode.window.showInformationMessage(`CBD: 已绑定 ${rel}（${scope}）→ ${binding.doc}`);
+  void vscode.window.showInformationMessage(
+    `CBD: 已绑定 ${target.path}（${scopeLabel}）→ ${binding.doc}`
+  );
 
   void (async () => {
     try {
@@ -450,6 +545,7 @@ async function openTarget(
     sourceRel: item.binding.target.path,
     startLine: item.binding.target.startLine,
     endLine: item.binding.target.endLine,
+    kind: item.binding.target.kind,
   });
 }
 
@@ -463,6 +559,7 @@ async function revealSourceRange(
         sourceRel?: string;
         startLine?: number;
         endLine?: number;
+        kind?: BindingKind;
       }
 ): Promise<void> {
   const store = getStore();
@@ -473,15 +570,18 @@ async function revealSourceRange(
   let sourceRel: string | undefined;
   let startLine: number | undefined;
   let endLine: number | undefined;
+  let kind: BindingKind | undefined;
 
   if (arg && 'binding' in arg && arg.binding) {
     sourceRel = arg.binding.target.path;
     startLine = arg.binding.target.startLine;
     endLine = arg.binding.target.endLine;
+    kind = arg.binding.target.kind;
   } else if (arg && 'sourceRel' in arg && arg.sourceRel) {
     sourceRel = arg.sourceRel;
     startLine = arg.startLine;
     endLine = arg.endLine;
+    kind = arg.kind;
   } else {
     const docRel =
       arg && 'docRel' in arg && arg.docRel
@@ -500,6 +600,7 @@ async function revealSourceRange(
     sourceRel = binding.target.path;
     startLine = binding.target.startLine;
     endLine = binding.target.endLine;
+    kind = binding.target.kind;
   }
 
   if (!sourceRel) {
@@ -507,6 +608,17 @@ async function revealSourceRange(
   }
 
   const uri = store.targetUri(sourceRel);
+
+  if (kind === 'directory') {
+    try {
+      await vscode.commands.executeCommand('revealInExplorer', uri);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      void vscode.window.showWarningMessage(`CBD: 无法定位文件夹（${msg}）`);
+    }
+    return;
+  }
+
   try {
     const doc = await vscode.workspace.openTextDocument(uri);
     const editor = await vscode.window.showTextDocument(doc, {
@@ -660,6 +772,11 @@ async function rebindDoc(
   const binding = index.bindings.find((b) => normalizeRelPath(b.doc) === docRel);
   if (!binding) {
     void vscode.window.showWarningMessage(`CBD: 未找到绑定文档 ${docRel}`);
+    return;
+  }
+
+  if (binding.target.kind === 'directory') {
+    void vscode.window.showWarningMessage('CBD: 目录绑定暂不支持重新绑定，请删除后重新创建。');
     return;
   }
 

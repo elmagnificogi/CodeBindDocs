@@ -6,10 +6,10 @@ const AGENTS_CONTENT = `# AGENTS
 
 ## 布局
 
-- 文档目录由设置 \`cbd.docsPath\` 决定，**默认 \`docs/\`**
-- \`docs/*.md\` — 设计文档；**绑定写在 Markdown YAML 文件头**
-- \`docs/cbd-index.md\` — 全部绑定的汇总目录（自动生成）
-- \`docs/assets/\` — 可选媒体（可用 \`cbd.assetsPath\` 覆盖）
+- 文档目录由设置 \`cbd.docsPath\` 决定，**默认 \`docs/cbd/\`**
+- \`docs/cbd/*.md\` — 设计文档；**绑定写在 Markdown YAML 文件头**
+- \`docs/cbd/cbd-index.md\` — 全部绑定的汇总目录（自动生成）
+- \`docs/cbd/assets/\` — 可选媒体（可用 \`cbd.assetsPath\` 覆盖）
 
 ## 绑定格式
 
@@ -23,7 +23,7 @@ cbd:
 
 ## Agent 规则
 
-1. 可先打开 \`docs/cbd-index.md\` 查看全部绑定。
+1. 可先打开 \`docs/cbd/cbd-index.md\` 查看全部绑定。
 2. 改源文件前，在文档目录中查找文件头 \`cbd.target\` 等于该路径的 Markdown，并先阅读。
 3. 若行为/设计意图变更，同步更新对应文档。
 4. 保持普通 Markdown；绑定只放在文件头 \`cbd:\` 下。
@@ -51,8 +51,8 @@ alwaysApply: false
 
 本项目用 CodeBind Docs 把设计文档放在源码旁：
 
-- 文档目录：\`cbd.docsPath\`（默认 \`docs/\`）
-- 汇总：\`docs/cbd-index.md\`（自动生成）
+- 文档目录：\`cbd.docsPath\`（默认 \`docs/cbd/\`）
+- 汇总：\`docs/cbd/cbd-index.md\`（自动生成）
 - 绑定：每个 Markdown 文件头的 YAML \`cbd.target\`
 - 模块对照见根目录 \`AGENTS.md\`
 

@@ -3,7 +3,7 @@ cbd:
   target: src/webview/markdownPane.ts
   kind: file
   symbol: MarkdownPane
-  contentHash: d68dbb78d719
+  contentHash: f5c13d3d1c03
 ---
 # markdownPane.ts
 

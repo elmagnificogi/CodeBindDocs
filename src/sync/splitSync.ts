@@ -170,7 +170,12 @@ export class SplitSync {
     const index = await store.read();
     const forFile = store.findBindingsForTarget(index, rel);
     if (!forFile.length) {
-      await this.showUnbound(rel, forceFocus, shouldOfferBind(rel, store));
+      await this.showUnbound(
+        rel,
+        forceFocus,
+        shouldOfferBind(rel, store),
+        dirDocRef(store.findDirectoryBindingForRel(index, rel))
+      );
       return;
     }
     const editor = vscode.window.visibleTextEditors.find(
@@ -231,7 +236,12 @@ export class SplitSync {
       }
       // Always leave the previous doc; otherwise switching package.json → package-lock.json
       // (and other skip-list files) keeps showing the old binding.
-      await this.showUnbound(rel, forceFocus, shouldOfferBind(rel, store));
+      await this.showUnbound(
+        rel,
+        forceFocus,
+        shouldOfferBind(rel, store),
+        dirDocRef(store.findDirectoryBindingForRel(index, rel))
+      );
       return;
     }
 
@@ -267,11 +277,12 @@ export class SplitSync {
   private async showUnbound(
     sourceRel: string,
     forceFocus: boolean,
-    canCreate = true
+    canCreate = true,
+    dirDoc?: { doc: string; dirPath: string }
   ): Promise<void> {
     this.syncing = true;
     try {
-      await this.pane.showUnbound(sourceRel, this.resolveColumn(), forceFocus, canCreate);
+      await this.pane.showUnbound(sourceRel, this.resolveColumn(), forceFocus, canCreate, dirDoc);
     } finally {
       this.syncing = false;
     }
@@ -322,4 +333,8 @@ function shouldOfferBind(rel: string, store: IndexStore): boolean {
     .getConfiguration('cbd')
     .get<boolean>('splitSync.promptWhenUnbound', true);
   return prompt;
+}
+
+function dirDocRef(dirBinding: Binding | undefined): { doc: string; dirPath: string } | undefined {
+  return dirBinding ? { doc: dirBinding.doc, dirPath: dirBinding.target.path } : undefined;
 }
