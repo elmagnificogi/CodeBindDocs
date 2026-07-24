@@ -22,7 +22,7 @@ suite('CodeBind Docs integration smoke', () => {
     const store = new IndexStore(folder);
 
     const sampleUri = vscode.Uri.joinPath(folder.uri, 'src', 'sample.ts');
-    const docRel = 'docs/sample.md';
+    const docRel = `${store.docsPath}/sample.md`;
     const docUri = store.docUri(docRel);
     const body = `# sample\n\noverview\n`;
     const md = `---
