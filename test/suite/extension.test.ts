@@ -10,9 +10,10 @@ suite('CodeBind Docs integration smoke', () => {
     await vscode.commands.executeCommand('cbd.initialize');
     const folder = vscode.workspace.workspaceFolders?.[0];
     assert.ok(folder, 'workspace folder required');
-    const docs = path.join(folder.uri.fsPath, 'docs');
+    const store = new IndexStore(folder);
+    const docs = path.join(folder.uri.fsPath, ...store.docsPath.split('/'));
     const agents = path.join(folder.uri.fsPath, 'AGENTS.md');
-    assert.ok(fs.existsSync(docs), 'docs/ should exist');
+    assert.ok(fs.existsSync(docs), `${store.docsPath}/ should exist`);
     assert.ok(fs.existsSync(agents), 'AGENTS.md should exist');
   });
 

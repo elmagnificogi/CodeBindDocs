@@ -21,7 +21,7 @@ export const INDEX_FILE_NAME = 'cbd-index.md';
 /**
  * Binding source of truth: YAML frontmatter in Markdown under the configured docs path.
  *
- * Default docs path: `docs/` (not under docs/).
+ * Default docs path: `docs/cbd/` (configurable via `cbd.docsPath`).
  */
 export class IndexStore {
   private cache: CbdIndex | undefined;
@@ -130,9 +130,9 @@ export class IndexStore {
     const indexPath = this.indexDocPath;
     const templatesRoot = this.templatesPath;
 
-    const files = await vscode.workspace.findFiles(
-      new vscode.RelativePattern(this.workspaceFolder, `${docsRoot}/**/*.md`)
-    );
+    // Walk the docs tree via fs — more reliable than findFiles for files written
+    // moments earlier (CI Extension Host search index can lag / miss them).
+    const files = await listMarkdownFiles(this.docsUri);
 
     for (const uri of files) {
       const relFromRoot = this.toWorkspaceRelative(uri);
@@ -447,6 +447,26 @@ export class IndexStore {
 
 function defaultDocBody(title: string): string {
   return `# ${title}\n\n## 概述\n\n在此描述设计意图、约束与不变量。\n\n## 备注\n\n-\n`;
+}
+
+/** Recursively list `*.md` under a folder (skips missing roots). */
+async function listMarkdownFiles(dir: vscode.Uri): Promise<vscode.Uri[]> {
+  const out: vscode.Uri[] = [];
+  let entries: [string, vscode.FileType][];
+  try {
+    entries = await vscode.workspace.fs.readDirectory(dir);
+  } catch {
+    return out;
+  }
+  for (const [name, type] of entries) {
+    const child = vscode.Uri.joinPath(dir, name);
+    if (type === vscode.FileType.Directory) {
+      out.push(...(await listMarkdownFiles(child)));
+    } else if (type === vscode.FileType.File && name.toLowerCase().endsWith('.md')) {
+      out.push(child);
+    }
+  }
+  return out;
 }
 
 /** Relative link from one workspace file to another (POSIX). */

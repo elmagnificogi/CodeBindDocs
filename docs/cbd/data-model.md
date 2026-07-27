@@ -28,6 +28,8 @@ docs/REQUIREMENTS.md  # 普通文档（无 cbd: 头，不算绑定）
 
 `updateTargetPath` 支持精确匹配与**目录前缀**替换（文件夹 rename 时批量更新子路径绑定）。
 
+`read()` 通过 `workspace.fs` **递归遍历** `{docsPath}` 下的 `*.md`（不用 `findFiles`），避免刚写入的绑定在 Extension Host / CI 里被搜索索引漏掉。
+
 ## 绑定声明（文件头）
 
 文档**文件最开头**用三连短横线包裹 YAML。正文示例勿再写裸分隔线（Vditor IR 会卡顿）。

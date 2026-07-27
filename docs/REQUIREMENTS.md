@@ -68,7 +68,7 @@ cbd:
   contentHash: abc
 ```
 
-- 扩展扫描 `{docsPath}/**/*.md`，用 `cbd.target` 匹配源文件
+- 扩展扫描 `{docsPath}` 下 Markdown（`workspace.fs` 递归遍历），用 `cbd.target` 匹配源文件
 - 同一源文件：多个 `range` + 至多一个 `file`；光标行优先**最窄** range，否则回退 file
 - **不修改**被绑定的源码文件
 - 无 `cbd:` 头的 Markdown 不算绑定
