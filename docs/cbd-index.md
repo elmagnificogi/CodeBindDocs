@@ -10,8 +10,8 @@
 | --- | --- | --- |
 | [`src/agent/scaffold.ts`](../src/agent/scaffold.ts) | [`docs/cbd/agent-scaffold.md`](./cbd/agent-scaffold.md) | file |
 | [`src/drift/driftChecker.ts`](../src/drift/driftChecker.ts) | [`docs/cbd/drift-checker.md`](./cbd/drift-checker.md) | file |
-| [`src/extension.ts`](../src/extension.ts) | [`docs/cbd/extension.md`](./cbd/extension.md) | file |
 | [`src/extension.ts`](../src/extension.ts) | [`docs/cbd/extension-activate.md`](./cbd/extension-activate.md) | range L15-58 (activate) |
+| [`src/extension.ts`](../src/extension.ts) | [`docs/cbd/extension.md`](./cbd/extension.md) | file |
 | [`src/store/frontmatter.ts`](../src/store/frontmatter.ts) | [`docs/cbd/store-frontmatter.md`](./cbd/store-frontmatter.md) | file |
 | [`src/store/indexStore.ts`](../src/store/indexStore.ts) | [`docs/cbd/data-model.md`](./cbd/data-model.md) | file |
 | [`src/store/types.ts`](../src/store/types.ts) | [`docs/cbd/store-types.md`](./cbd/store-types.md) | file |
