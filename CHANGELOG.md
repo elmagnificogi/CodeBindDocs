@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.11] - 2026-07-27
+
+### Fixed
+
+- `IndexStore.read()` 改为 `workspace.fs` 递归扫描文档目录，避免 CI / Extension Host 下 `findFiles` 漏掉刚写入的绑定
+
+### Changed
+
+- 刷新旁路文档 contentHash；集成测试按 `cbd.docsPath`（默认 `docs/cbd`）断言
+
 ## [0.1.10] - 2026-07-24
 
 ### Added
