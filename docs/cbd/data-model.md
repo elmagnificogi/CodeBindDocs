@@ -3,7 +3,7 @@ cbd:
   target: src/store/indexStore.ts
   kind: file
   symbol: IndexStore
-  contentHash: ca44fdab03da
+  contentHash: 8aab76793a38
 ---
 # indexStore.ts / 数据模型
 

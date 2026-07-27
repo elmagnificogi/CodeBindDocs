@@ -2,7 +2,7 @@
 cbd:
   target: src/store/types.ts
   kind: file
-  contentHash: 6b645e7c2ed6
+  contentHash: f295c5dcd672
 ---
 # types.ts
 

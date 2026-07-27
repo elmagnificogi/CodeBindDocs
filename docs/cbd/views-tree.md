@@ -3,7 +3,7 @@ cbd:
   target: src/views/cbdTreeProvider.ts
   kind: file
   symbol: CbdTreeProvider
-  contentHash: ae6ea0e88c66
+  contentHash: b59a9b3aaeb8
 ---
 # cbdTreeProvider.ts
 

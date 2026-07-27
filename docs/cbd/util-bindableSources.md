@@ -3,7 +3,7 @@ cbd:
   target: src/util/bindableSources.ts
   kind: file
   symbol: scanBindingCoverage
-  contentHash: 77510831be02
+  contentHash: badb70cdc6b0
 ---
 # bindableSources.ts
 

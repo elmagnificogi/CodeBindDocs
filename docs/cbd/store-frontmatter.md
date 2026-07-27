@@ -2,7 +2,7 @@
 cbd:
   target: src/store/frontmatter.ts
   kind: file
-  contentHash: b2b7af5229c5
+  contentHash: 0b05813ce7d1
 ---
 * [ ]  ****
 

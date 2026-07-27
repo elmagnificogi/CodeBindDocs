@@ -3,7 +3,7 @@ cbd:
   target: src/agent/scaffold.ts
   kind: file
   symbol: scaffoldAgentFiles
-  contentHash: 27c5c14e4a80
+  contentHash: e155301edf8b
 ---
 # scaffold.ts
 
