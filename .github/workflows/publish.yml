@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   publish:
@@ -61,3 +61,37 @@ jobs:
           VSIX="$(ls -1 *.vsix | head -n1)"
           echo "Publishing $VSIX to Open VSX"
           npx ovsx publish --no-dependencies "$VSIX" -p "$OVSX_PAT"
+
+      - name: Prepare release notes from CHANGELOG
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG_VER="${GITHUB_REF_NAME#v}"
+          awk -v ver="$TAG_VER" '
+            $0 ~ ("^## \\[" ver "\\]") { p=1; print; next }
+            p && /^## \[/ { exit }
+            p { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "CodeBind Docs ${GITHUB_REF_NAME}" > release-notes.md
+            echo "" >> release-notes.md
+            echo "- VS Marketplace / Open VSX publish" >> release-notes.md
+          fi
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "- VS Marketplace: https://marketplace.visualstudio.com/items?itemName=codebinddocs.codebinddocs"
+            echo "- Open VSX: https://open-vsx.org/extension/codebinddocs/codebinddocs"
+          } >> release-notes.md
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VSIX="$(ls -1 *.vsix | head -n1)"
+          gh release create "$GITHUB_REF_NAME" "$VSIX" \
+            --title "CodeBind Docs ${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md \
+            --verify-tag

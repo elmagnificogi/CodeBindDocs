@@ -87,7 +87,8 @@ git push origin v0.1.6
 ```
 
 3. tag 必须与 `package.json` 的 `version` 一致（`v` 前缀），否则 workflow 失败。  
-4. 也可在 Actions 里手动 **Run workflow**（`workflow_dispatch`）；手动跑时不做 tag/版本校验。
+4. 成功后会：发 VS Marketplace、发 Open VSX、并在 GitHub **Releases** 创建同名 release（附带 `.vsix`，说明取自 `CHANGELOG.md` 对应章节）。  
+5. 也可在 Actions 里手动 **Run workflow**（`workflow_dispatch`）；手动跑时不做 tag/版本校验，也**不**创建 GitHub Release。
 
 本地仍可网页上传 `.vsix`：https://marketplace.visualstudio.com/manage 、https://open-vsx.org/
 
