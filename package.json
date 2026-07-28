@@ -2,7 +2,7 @@
   "name": "codebinddocs",
   "displayName": "CodeBindDocs",
   "description": "代码绑定文档：源码零侵入，Markdown + 分栏同步，本地可 Git，人与 Agent 共用设计上下文。",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "publisher": "codebinddocs",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -242,7 +242,7 @@
         "cbd.docPane.outline": {
           "type": "boolean",
           "default": true,
-          "description": "Show a document outline (TOC) beside the instant-rendering editor."
+          "description": "Show the document outline (TOC) in bound documents. Applies to the instant-rendering editor and is enabled by default."
         }
       }
     }

@@ -49,6 +49,8 @@ type HostToWeb =
       deletable: boolean;
       /** When set, show「Code」and jump to this range/file. */
       sourceJump?: SourceJump;
+      /** Nearest ancestor directory binding for the current source target. */
+      directoryDoc?: { doc: string; dirPath: string };
       canBack: boolean;
       canForward: boolean;
     }
@@ -85,6 +87,7 @@ type HostToWeb =
       canBack: boolean;
       canForward: boolean;
     }
+  | { type: 'outlineSettingChanged'; enabled: boolean }
   | { type: 'warmIr' }
   | {
       type: 'assetSaved';
@@ -161,6 +164,9 @@ export class MarkdownPane {
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration('cbd.docPane.mode')) {
           this.mode = this.readModeSetting();
+        }
+        if (e.affectsConfiguration('cbd.docPane.outline')) {
+          void this.postOutlineSetting();
         }
       }),
       vscode.workspace.onDidSaveTextDocument((doc) => {
@@ -255,6 +261,7 @@ export class MarkdownPane {
       if (forceFocus) {
         this.panel.reveal(col, false);
       }
+      await this.postOutlineSetting();
       return;
     }
 
@@ -548,6 +555,7 @@ export class MarkdownPane {
       // Never move an existing panel into Beside/Two — that resizes editor groups.
       const col = this.panel.viewColumn ?? column;
       this.panel.reveal(col, preserveFocus);
+      await this.postOutlineSetting();
       return;
     }
 
@@ -580,6 +588,7 @@ export class MarkdownPane {
 
     this.panel.webview.onDidReceiveMessage(async (msg: WebToHost) => {
       if (msg.type === 'ready') {
+        await this.postOutlineSetting();
         if (this.viewingHome) {
           await this.postHome();
         } else if (this.viewingCoverage) {
@@ -731,6 +740,7 @@ export class MarkdownPane {
         store && docRel && store.isUnderDocsPath(docRel) && !store.isIndexDoc(docRel)
       );
       let sourceJump: SourceJump | undefined;
+      let directoryDoc: { doc: string; dirPath: string } | undefined;
       if (store && docRel && !store.isIndexDoc(docRel)) {
         try {
           const index = await store.read();
@@ -742,6 +752,18 @@ export class MarkdownPane {
               startLine: binding.target.startLine,
               endLine: binding.target.endLine,
             };
+            if (binding.target.kind !== 'directory') {
+              const directoryBinding = store.findDirectoryBindingForRel(
+                index,
+                binding.target.path
+              );
+              if (directoryBinding) {
+                directoryDoc = {
+                  doc: directoryBinding.doc,
+                  dirPath: directoryBinding.target.path,
+                };
+              }
+            }
           }
         } catch {
           // ignore
@@ -773,6 +795,7 @@ export class MarkdownPane {
         docRel,
         deletable,
         sourceJump,
+        directoryDoc,
         ...this.navFlags(),
       };
       await this.panel.webview.postMessage(payload);
@@ -1160,6 +1183,7 @@ export class MarkdownPane {
       <button type="button" id="btnSource">文档源码</button>
       <span class="sep"></span>
       <button type="button" id="btnRevealSource" class="hidden-mode" title="在左侧打开并选中绑定的代码范围">Code</button>
+      <button type="button" id="btnDirectoryDoc" class="hidden-mode" title="打开当前代码上层目录的绑定文档">目录文档</button>
       <button type="button" id="btnDelete" class="danger hidden-mode" title="删除此文档">删除</button>
     </span>
     <span class="hint" id="hint">输入 Markdown 即时渲染 · YAML 头已隐藏</span>
@@ -1216,6 +1240,7 @@ export class MarkdownPane {
     const btnSource = document.getElementById('btnSource');
     const btnDelete = document.getElementById('btnDelete');
     const btnRevealSource = document.getElementById('btnRevealSource');
+    const btnDirectoryDoc = document.getElementById('btnDirectoryDoc');
     const btnBack = document.getElementById('btnBack');
     const btnForward = document.getElementById('btnForward');
     const btnHome = document.getElementById('btnHome');
@@ -1243,7 +1268,7 @@ export class MarkdownPane {
     const coveragePageList = document.getElementById('coveragePageList');
     const hashBulkRow = document.getElementById('hashBulkRow');
     const btnRefreshAllHashes = document.getElementById('btnRefreshAllHashes');
-    const outlineEnable = ${outlineEnable ? 'true' : 'false'};
+    let outlineEnable = ${outlineEnable ? 'true' : 'false'};
     const assetWaiters = {};
     let assetReqSeq = 0;
 
@@ -1303,6 +1328,7 @@ export class MarkdownPane {
     let unboundDirDocRel = '';
     let currentDocRel = '';
     let sourceJump = null;
+    let directoryDocRel = '';
 
     function isDark() {
       return document.body.classList.contains('vscode-dark')
@@ -1329,6 +1355,16 @@ export class MarkdownPane {
       } else if (show) {
         btnRevealSource.title = '打开绑定的源文件';
         btnRevealSource.textContent = 'Code';
+      }
+    }
+
+    function setDirectoryDocVisible(directoryDoc) {
+      directoryDocRel = directoryDoc && directoryDoc.doc ? directoryDoc.doc : '';
+      const show = !!directoryDocRel;
+      btnDirectoryDoc.classList.toggle('hidden-mode', !show);
+      if (show) {
+        btnDirectoryDoc.title =
+          '打开上层目录文档：' + (directoryDoc.dirPath || directoryDocRel);
       }
     }
 
@@ -1379,6 +1415,7 @@ export class MarkdownPane {
       currentDocRel = '';
       setDeleteVisible(false);
       setRevealSourceVisible(null);
+      setDirectoryDocVisible(null);
       unboundPath.textContent = unboundSourceRel;
       unboundEl.classList.add('visible');
       const allowCreate = canCreate !== false;
@@ -1425,6 +1462,7 @@ export class MarkdownPane {
       currentDocRel = '';
       setDeleteVisible(false);
       setRevealSourceVisible(null);
+      setDirectoryDocVisible(null);
       homeDocsPath.textContent = (docsPath || 'docs') + '/';
       docList.innerHTML = '';
       missingList.innerHTML = '';
@@ -1592,6 +1630,7 @@ export class MarkdownPane {
       currentDocRel = '';
       setDeleteVisible(false);
       setRevealSourceVisible(null);
+      setDirectoryDocVisible(null);
       coveragePageList.innerHTML = '';
       const list = unbound || [];
       const unboundTotal = Math.max(0, (total || 0) - (boundCount || 0));
@@ -1864,7 +1903,7 @@ export class MarkdownPane {
           'headings', 'bold', 'italic', 'strike', '|',
           'list', 'ordered-list', 'check', '|',
           'quote', 'code', 'inline-code', 'link', 'table', 'upload', '|',
-          'undo', 'redo', '|', 'outline'
+          'undo', 'redo', 'outline'
         ],
         theme: isDark() ? 'dark' : 'classic',
         preview: {
@@ -1892,6 +1931,7 @@ export class MarkdownPane {
         after: function () {
           applying = false;
           irReady = true;
+          setOutlineEnabled(outlineEnable);
           try { vditor.resize(Math.max(240, window.innerHeight - 40)); } catch (_) {}
           if (pendingIrReveal && mode === 'ir') {
             pendingIrReveal = false;
@@ -1906,6 +1946,29 @@ export class MarkdownPane {
         }
       });
       return true;
+    }
+
+    function setOutlineEnabled(enabled) {
+      outlineEnable = enabled === true;
+      if (!vditor) return;
+      try {
+        // The public Vditor instance wraps the internal IVditor state in its
+        // vditor field; outline/options/toolbar are not public top-level fields.
+        const editor = vditor.vditor;
+        if (!editor || !editor.outline) {
+          throw new Error('Vditor internal outline is unavailable');
+        }
+        editor.options.outline.enable = outlineEnable;
+        editor.outline.toggle(editor, outlineEnable, false);
+        const outlineButton = editor.toolbar &&
+          editor.toolbar.elements &&
+          editor.toolbar.elements.outline;
+        if (outlineButton) {
+          outlineButton.style.display = outlineEnable ? '' : 'none';
+        }
+      } catch (err) {
+        console.warn('CBD: failed to update outline setting', err);
+      }
     }
 
     function setIrValue(markdown) {
@@ -1930,11 +1993,21 @@ export class MarkdownPane {
       try { vditor && vditor.resize(Math.max(240, window.innerHeight - 40)); } catch (_) {}
     }
 
-    function applyMarkdown(markdown, nextMode, canBack, canForward, docRel, deletable, jump) {
+    function applyMarkdown(
+      markdown,
+      nextMode,
+      canBack,
+      canForward,
+      docRel,
+      deletable,
+      jump,
+      directoryDoc
+    ) {
       pendingMarkdown = markdown || '';
       currentDocRel = docRel || '';
       setDeleteVisible(!!deletable);
       setRevealSourceVisible(jump);
+      setDirectoryDocVisible(directoryDoc);
       mode = nextMode === 'source' || nextMode === 'sv' ? 'source' : 'ir';
       setModeButtons();
       showEditor(canBack, canForward);
@@ -2051,6 +2124,10 @@ export class MarkdownPane {
         endLine: sourceJump.endLine
       });
     });
+    btnDirectoryDoc.addEventListener('click', function () {
+      if (!directoryDocRel) return;
+      vscodeApi.postMessage({ type: 'openDoc', docRel: directoryDocRel });
+    });
     btnDelete.addEventListener('click', function () {
       if (!currentDocRel) return;
       vscodeApi.postMessage({ type: 'deleteDoc', docRel: currentDocRel });
@@ -2087,6 +2164,10 @@ export class MarkdownPane {
       if (!msg) return;
       if (msg.type === 'warmIr') {
         scheduleWarmIr(true);
+        return;
+      }
+      if (msg.type === 'outlineSettingChanged') {
+        setOutlineEnabled(msg.enabled);
         return;
       }
       if (msg.type === 'unbound') {
@@ -2127,7 +2208,8 @@ export class MarkdownPane {
         msg.canForward,
         msg.docRel || '',
         !!msg.deletable,
-        msg.sourceJump || null
+        msg.sourceJump || null,
+        msg.directoryDoc || null
       );
     });
 
@@ -2135,6 +2217,20 @@ export class MarkdownPane {
   </script>
 </body>
 </html>`;
+  }
+
+  /** Keep retained/revealed webviews aligned with the effective setting. */
+  private async postOutlineSetting(): Promise<void> {
+    if (!this.panel) {
+      return;
+    }
+    const enabled = vscode.workspace
+      .getConfiguration('cbd')
+      .get<boolean>('docPane.outline', true);
+    await this.panel.webview.postMessage({
+      type: 'outlineSettingChanged',
+      enabled,
+    } satisfies HostToWeb);
   }
 }
 

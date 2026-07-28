@@ -113,6 +113,7 @@ npm run package    # 生成 .vsix（需 vsce）
 | 模式 | 说明 |
 |------|------|
 | 即时渲染 | Vditor IR，类 Typora；可开大纲（`cbd.docPane.outline`） |
+| 上层目录文档 | 当前代码的祖先目录有目录绑定时，关联文档顶部显示「目录文档」按钮 |
 | 文档源码 | 纯 Markdown 文本，适合精细改写 |
 
 工具栏 **Code** 用于跳转到绑定的源文件（range 时选中行范围）。
@@ -201,7 +202,7 @@ heading: 概述
 | `cbd.splitSync.promptWhenUnbound` | `true` | 自动分栏开启时，无绑定是否显示新建入口 |
 | `cbd.splitSync.viewColumn` | `Beside` | `Beside` 或 `Two` |
 | `cbd.docPane.mode` | `ir` | `ir` 即时渲染 / `source` 纯文本 |
-| `cbd.docPane.outline` | `true` | IR 右侧大纲 |
+| `cbd.docPane.outline` | `true` | 是否在关联文档的 IR 编辑器右侧显示大纲；修改后对已打开面板即时生效 |
 
 模板正文可用占位符 `{{title}}`。
 
