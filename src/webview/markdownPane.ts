@@ -1,3 +1,4 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { DriftIssue } from '../drift/driftChecker';
 import { joinMarkdown, splitMarkdown } from '../store/frontmatter';
@@ -144,6 +145,13 @@ export class MarkdownPane {
   private header: string | undefined;
   private writing = false;
   private saveTimer: NodeJS.Timeout | undefined;
+  /** Markdown last sent to the webview (for dirty detection). */
+  private loadedWebMarkdown = '';
+  private pendingMarkdown: string | undefined;
+  private isDirty = false;
+  /** Disk mtime when the current doc was last loaded or saved by this pane. */
+  private lastLoadedMtime = 0;
+  private docWatcher: vscode.Disposable | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   private mode: DocMode = 'ir';
   private history: NavEntry[] = [];
@@ -191,9 +199,9 @@ export class MarkdownPane {
   }
 
   dispose(): void {
-    if (this.saveTimer) {
-      clearTimeout(this.saveTimer);
-    }
+    this.cancelPendingSave();
+    this.docWatcher?.dispose();
+    this.docWatcher = undefined;
     this.panel?.dispose();
     for (const d of this.disposables) {
       d.dispose();
@@ -222,10 +230,9 @@ export class MarkdownPane {
 
   /** Cancel autosave and detach if the pane is showing this doc (before file delete). */
   releaseDoc(docWorkspaceRel: string): void {
-    if (this.saveTimer) {
-      clearTimeout(this.saveTimer);
-      this.saveTimer = undefined;
-    }
+    this.cancelPendingSave();
+    this.isDirty = false;
+    this.pendingMarkdown = undefined;
     const cur = this.currentDocRel;
     if (cur && normalizeRelPath(cur) === normalizeRelPath(docWorkspaceRel)) {
       this.currentUri = undefined;
@@ -246,6 +253,30 @@ export class MarkdownPane {
     return this.panel?.viewColumn ?? requested;
   }
 
+  /** Reload from disk when the file changed externally (same doc still open). */
+  async reloadIfStaleFromDisk(): Promise<void> {
+    if (!this.panel || !this.currentUri || this.viewingHome || this.viewingCoverage) {
+      return;
+    }
+    if (this.writing) {
+      return;
+    }
+    try {
+      const stat = await vscode.workspace.fs.stat(this.currentUri);
+      if (stat.mtime <= this.lastLoadedMtime) {
+        return;
+      }
+      if (this.isDirty) {
+        void vscode.window.showInformationMessage(
+          'CBD: 文档已在外部修改，面板内容已重新加载'
+        );
+      }
+      await this.reloadFromDisk();
+    } catch {
+      // ignore missing file etc.
+    }
+  }
+
   async show(docUri: vscode.Uri, column: vscode.ViewColumn, forceFocus: boolean): Promise<void> {
     const store = this.getStore();
     const docRel = store?.toWorkspaceRelative(docUri);
@@ -261,10 +292,12 @@ export class MarkdownPane {
       if (forceFocus) {
         this.panel.reveal(col, false);
       }
+      await this.reloadIfStaleFromDisk();
       await this.postOutlineSetting();
       return;
     }
 
+    await this.prepareDocSwitch();
     this.unboundSourceRel = undefined;
     this.viewingHome = false;
     this.viewingCoverage = false;
@@ -302,6 +335,8 @@ export class MarkdownPane {
       return;
     }
 
+    await this.prepareDocSwitch();
+    this.updateDocWatcher(undefined);
     this.currentUri = undefined;
     this.header = undefined;
     this.viewingHome = false;
@@ -329,7 +364,8 @@ export class MarkdownPane {
   }
 
   async showHome(column: vscode.ViewColumn, forceFocus = true): Promise<void> {
-    await this.flushPendingSave();
+    await this.prepareDocSwitch();
+    this.updateDocWatcher(undefined);
     this.currentUri = undefined;
     this.header = undefined;
     this.unboundSourceRel = undefined;
@@ -350,7 +386,8 @@ export class MarkdownPane {
   }
 
   async showCoverage(column: vscode.ViewColumn, forceFocus = true): Promise<void> {
-    await this.flushPendingSave();
+    await this.prepareDocSwitch();
+    this.updateDocWatcher(undefined);
     this.currentUri = undefined;
     this.header = undefined;
     this.unboundSourceRel = undefined;
@@ -611,12 +648,12 @@ export class MarkdownPane {
         return;
       }
       if (msg.type === 'navHome') {
-        await this.flushPendingSave();
+        await this.prepareDocSwitch();
         await this.showHome(this.panel?.viewColumn ?? vscode.ViewColumn.Beside, true);
         return;
       }
       if (msg.type === 'navCoverage') {
-        await this.flushPendingSave();
+        await this.prepareDocSwitch();
         await this.showCoverage(this.panel?.viewColumn ?? vscode.ViewColumn.Beside, true);
         return;
       }
@@ -624,7 +661,7 @@ export class MarkdownPane {
         if (this.historyIndex <= 0) {
           return;
         }
-        await this.flushPendingSave();
+        await this.prepareDocSwitch();
         this.historyIndex -= 1;
         await this.restoreHistory(this.history[this.historyIndex]);
         return;
@@ -633,7 +670,7 @@ export class MarkdownPane {
         if (this.historyIndex >= this.history.length - 1) {
           return;
         }
-        await this.flushPendingSave();
+        await this.prepareDocSwitch();
         this.historyIndex += 1;
         await this.restoreHistory(this.history[this.historyIndex]);
         return;
@@ -643,7 +680,7 @@ export class MarkdownPane {
         if (!store) {
           return;
         }
-        await this.flushPendingSave();
+        await this.prepareDocSwitch();
         const uri = store.docUri(normalizeRelPath(msg.docRel));
         await this.show(uri, this.panel?.viewColumn ?? vscode.ViewColumn.Beside, true);
         return;
@@ -706,6 +743,7 @@ export class MarkdownPane {
 
     this.panel.onDidDispose(() => {
       this.panel = undefined;
+      this.updateDocWatcher(undefined);
       this.currentUri = undefined;
       this.unboundSourceRel = undefined;
       this.viewingHome = false;
@@ -716,20 +754,72 @@ export class MarkdownPane {
     });
   }
 
-  private async flushPendingSave(): Promise<void> {
+  private async prepareDocSwitch(): Promise<void> {
+    this.cancelPendingSave();
+    if (!this.isDirty || !this.currentUri) {
+      return;
+    }
+    try {
+      const stat = await vscode.workspace.fs.stat(this.currentUri);
+      if (stat.mtime > this.lastLoadedMtime) {
+        this.isDirty = false;
+        this.pendingMarkdown = undefined;
+        return;
+      }
+    } catch {
+      this.isDirty = false;
+      this.pendingMarkdown = undefined;
+      return;
+    }
+    await this.flushSaveNow();
+  }
+
+  private cancelPendingSave(): void {
     if (this.saveTimer) {
       clearTimeout(this.saveTimer);
       this.saveTimer = undefined;
     }
   }
 
+  private updateDocWatcher(uri: vscode.Uri | undefined): void {
+    this.docWatcher?.dispose();
+    this.docWatcher = undefined;
+    if (!uri) {
+      return;
+    }
+    const dir = vscode.Uri.file(path.dirname(uri.fsPath));
+    const base = path.basename(uri.fsPath);
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(dir, base));
+    this.docWatcher = vscode.Disposable.from(
+      watcher,
+      watcher.onDidChange((changed) => {
+        if (changed.fsPath !== uri.fsPath || this.writing) {
+          return;
+        }
+        void this.reloadIfStaleFromDisk();
+      })
+    );
+  }
+
+  private async flushSaveNow(): Promise<void> {
+    this.cancelPendingSave();
+    if (!this.isDirty || !this.currentUri || this.pendingMarkdown === undefined) {
+      return;
+    }
+    await this.saveBody(this.pendingMarkdown);
+  }
+
   private async reloadFromDisk(): Promise<void> {
     if (!this.panel || !this.currentUri) {
       return;
     }
+    this.cancelPendingSave();
+    this.isDirty = false;
+    this.pendingMarkdown = undefined;
     try {
       const store = this.getStore();
       const docRel = store?.toWorkspaceRelative(this.currentUri) ?? '';
+      const stat = await vscode.workspace.fs.stat(this.currentUri);
       const raw = await vscode.workspace.fs.readFile(this.currentUri);
       const text = Buffer.from(raw).toString('utf8');
       const { header, body } = splitMarkdown(text);
@@ -787,6 +877,9 @@ export class MarkdownPane {
         markdownForWeb = rewritten.markdown;
         this.imageUriReverse = rewritten.reverse;
       }
+      this.lastLoadedMtime = stat.mtime;
+      this.loadedWebMarkdown = markdownForWeb;
+      this.updateDocWatcher(this.currentUri);
       const payload: HostToWeb = {
         type: 'load',
         title,
@@ -806,11 +899,14 @@ export class MarkdownPane {
   }
 
   private scheduleSave(markdown: string): void {
-    if (this.saveTimer) {
-      clearTimeout(this.saveTimer);
+    if (markdown === this.loadedWebMarkdown) {
+      return;
     }
+    this.isDirty = true;
+    this.pendingMarkdown = markdown;
+    this.cancelPendingSave();
     this.saveTimer = setTimeout(() => {
-      void this.saveBody(unprotectHrInFences(markdown));
+      void this.flushSaveNow();
     }, 400);
   }
 
@@ -885,7 +981,18 @@ export class MarkdownPane {
   }
 
   private async saveBody(body: string): Promise<void> {
-    if (!this.currentUri) {
+    if (!this.currentUri || !this.isDirty) {
+      return;
+    }
+    try {
+      const stat = await vscode.workspace.fs.stat(this.currentUri);
+      if (stat.mtime > this.lastLoadedMtime) {
+        this.isDirty = false;
+        this.pendingMarkdown = undefined;
+        await this.reloadFromDisk();
+        return;
+      }
+    } catch {
       return;
     }
     this.writing = true;
@@ -898,6 +1005,11 @@ export class MarkdownPane {
         cleaned.endsWith('\n') ? cleaned : cleaned + '\n'
       );
       await vscode.workspace.fs.writeFile(this.currentUri, Buffer.from(content, 'utf8'));
+      const stat = await vscode.workspace.fs.stat(this.currentUri);
+      this.lastLoadedMtime = stat.mtime;
+      this.loadedWebMarkdown = body;
+      this.isDirty = false;
+      this.pendingMarkdown = undefined;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       void vscode.window.showWarningMessage(`CBD: 保存文档失败（${msg}）`);

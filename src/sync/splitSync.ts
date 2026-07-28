@@ -310,6 +310,7 @@ export class SplitSync {
   ): Promise<void> {
     const docUri = store.docUri(normalizeRelPath(binding.doc));
     if (this.pane.currentFsPath === docUri.fsPath && !forceFocus) {
+      await this.pane.reloadIfStaleFromDisk();
       return;
     }
 
