@@ -505,13 +505,9 @@ async function revealBoundDoc(): Promise<void> {
   }
   const ok = await splitSync?.revealDocForUri(editor.document.uri);
   if (!ok) {
-    const choice = await vscode.window.showInformationMessage(
-      'CBD: 该文件无关联文档。',
-      '新建关联文档'
+    void vscode.window.showInformationMessage(
+      'CBD: 无法打开关联文档（需在工作区源文件上使用，且文档目录已初始化）。'
     );
-    if (choice === '新建关联文档') {
-      await bindCurrentFile(getWorkspaceStore);
-    }
   }
 }
 

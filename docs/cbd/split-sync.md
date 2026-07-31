@@ -19,7 +19,7 @@ cbd:
 4. **`cbd.splitSync.enabled`**：为 true 时自动打开/切换文档面板；为 false 时不强制弹窗，但仍更新状态栏；若面板已打开则继续跟随当前文件
 5. 忽略非 `file` 与文档目录内文件；是否提示「新建」由 `isBindableSourceRel` + `promptWhenUnbound` 决定（仅自动分栏开启时）
 6. 有绑定则打开文档；无绑定则切换到「无关联文档」（仅自动分栏开启时）
-7. **状态栏** / 快捷键 **`Ctrl+Alt+D`**（Mac `Cmd+Alt+D`）：`cbd.revealBoundDoc` 一键打开当前源文件绑定文档
+7. **状态栏** / 快捷键 **`Ctrl+Alt+D`**（Mac `Cmd+Alt+D`）：`cbd.revealBoundDoc` 一键打开当前源文件绑定文档；**无绑定时直接打开「无关联文档」面板**（可从中新建），不弹提示框；关闭自动分栏时同样生效
 8. **`Ctrl+Alt+Shift+D`**：`cbd.toggleSplitSync` 开关自动分栏
 
 ## 设置

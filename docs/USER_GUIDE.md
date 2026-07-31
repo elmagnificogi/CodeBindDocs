@@ -76,8 +76,8 @@ npm run package    # 生成 .vsix（需 vsce）
 - **关闭自动分栏**后：打开代码时不再强制弹文档窗；状态栏在有绑定时仍显示，可点；也可用一键打开  
 - **一键打开当前代码的绑定文档**：`CBD: Reveal Bound Doc`  
   - 快捷键：`Ctrl+Alt+D`（Mac `Cmd+Alt+D`）  
-  - 无绑定时会提示并可新建  
-- 无绑定时（仅自动分栏开启）：右侧显示「无关联文档」，可一键新建（`cbd.splitSync.promptWhenUnbound`）  
+  - 无绑定时直接打开「无关联文档」面板，可从中新建（关闭自动分栏时同样可用）  
+- 无绑定时（仅自动分栏开启）：切换源文件也会自动显示「无关联文档」（`cbd.splitSync.promptWhenUnbound` 控制是否提供新建入口）  
 
 分栏位置：`cbd.splitSync.viewColumn` = `Beside`（默认）或 `Two`。
 
@@ -225,7 +225,7 @@ heading: 概述
 | `CBD: Bind Doc to Current File` | 为当前/指定源文件新建绑定 |
 | `CBD: Rebind Doc to Source` | 改绑到新源文件或新粒度 |
 | `CBD: Delete Bound Doc` | 删除绑定文档 |
-| `CBD: Reveal Bound Doc` | 打开当前文件的旁路文档（`Ctrl+Alt+D`） |
+| `CBD: Reveal Bound Doc` | 打开当前文件的旁路文档（`Ctrl+Alt+D`）；无绑定时打开「无关联文档」面板可新建 |
 | `CBD: Reveal Source Range` | 从文档跳到源码选区 |
 | `CBD: Retighten Range by Symbol` | 按 symbol 重算行号 |
 | `CBD: Open Docs Index` | 打开文档主页 |

@@ -105,13 +105,18 @@ export class SplitSync {
     }
   }
 
+  /**
+   * Open the bound doc for a source file (force focus).
+   * If unbound, open the「无关联文档」pane so the user can create a binding —
+   * including when auto split-sync is off (shortcut / status bar / CodeLens).
+   */
   async revealDocForUri(sourceUri: vscode.Uri): Promise<boolean> {
     const store = this.getStore();
     if (!store) {
       return false;
     }
     const rel = store.toWorkspaceRelative(sourceUri);
-    if (!rel) {
+    if (!rel || store.isUnderDocsPath(rel)) {
       return false;
     }
     const editor = vscode.window.visibleTextEditors.find(
@@ -122,7 +127,13 @@ export class SplitSync {
     const binding =
       store.resolveBindingForLine(index, rel, line) ?? store.findByTargetPath(index, rel);
     if (!binding) {
-      return false;
+      await this.showUnbound(
+        rel,
+        true,
+        shouldOfferBind(rel, store),
+        dirDocRef(store.findDirectoryBindingForRel(index, rel))
+      );
+      return true;
     }
     await this.openDoc(store, binding, true);
     return true;
