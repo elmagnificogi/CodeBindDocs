@@ -31,7 +31,6 @@
 | `src/webview/mdProtect.ts` | `docs/webview-mdProtect.md` |
 | `src/views/cbdTreeProvider.ts` | `docs/views-tree.md` |
 | `src/views/cbdCodeLens.ts` | `docs/views-codelens.md` |
-| `src/agent/scaffold.ts` | `docs/agent-scaffold.md` |
 | `src/util/rangePicker.ts` | `docs/util-rangePicker.md` |
 | `src/util/docTemplates.ts` | `docs/util-docTemplates.md` |
 | `src/util/rangeOverlap.ts` | `docs/util-rangeOverlap.md` |
