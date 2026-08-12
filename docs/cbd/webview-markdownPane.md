@@ -20,6 +20,7 @@ CodeBind Docs 右侧文档面板：Vditor IR / 源码、主页、覆盖率、图
 - 大纲：`cbd.docPane.outline`（默认开启）；设置变化通过消息即时切换右侧 TOC，并同步显示或隐藏工具栏大纲入口，不重建 webview；Webview ready、复用 reveal、重复打开同一文档时都会重发当前值，避免保留面板漏掉配置事件
 - 关联代码的任一祖先目录存在 `directory` 绑定时，顶部操作栏显示「目录文档」，并打开最接近当前代码路径的目录绑定；目录文档自身不显示该按钮
 - **外部变更**：`FileSystemWatcher` 监听当前文档；磁盘 mtime 新于面板加载时间则自动 `reloadFromDisk`；autosave 不会用陈旧 webview 内容覆盖外部修改（切换文档前也会检测磁盘是否已更新）
+- **`refreshCatalogIfOpen`**：主页 / 覆盖率页打开时重发当前目录数据（供刷新命令）
 
 ## 性能
 

@@ -161,6 +161,15 @@ export class SplitSync {
     return this.pane.isHome;
   }
 
+  isCoverage(): boolean {
+    return this.pane.isCoverage;
+  }
+
+  /** Refresh home / coverage in place; returns false if those pages are not open. */
+  async refreshCatalogIfOpen(): Promise<boolean> {
+    return this.pane.refreshCatalogIfOpen();
+  }
+
   releaseDoc(docRel: string): void {
     this.pane.releaseDoc(docRel);
   }

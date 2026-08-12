@@ -460,9 +460,9 @@ async function listMarkdownFiles(dir: vscode.Uri): Promise<vscode.Uri[]> {
   }
   for (const [name, type] of entries) {
     const child = vscode.Uri.joinPath(dir, name);
-    if (type === vscode.FileType.Directory) {
+    if (type & vscode.FileType.Directory) {
       out.push(...(await listMarkdownFiles(child)));
-    } else if (type === vscode.FileType.File && name.toLowerCase().endsWith('.md')) {
+    } else if ((type & vscode.FileType.File) !== 0 && name.toLowerCase().endsWith('.md')) {
       out.push(child);
     }
   }

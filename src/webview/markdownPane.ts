@@ -224,6 +224,27 @@ export class MarkdownPane {
     return this.viewingHome;
   }
 
+  get isCoverage(): boolean {
+    return this.viewingCoverage;
+  }
+
+  /** Re-render home / coverage if that catalog page is currently shown. */
+  async refreshCatalogIfOpen(): Promise<boolean> {
+    if (!this.panel) {
+      return false;
+    }
+    if (this.viewingHome) {
+      await this.refreshDrift();
+      await this.postHome();
+      return true;
+    }
+    if (this.viewingCoverage) {
+      await this.postCoverage();
+      return true;
+    }
+    return false;
+  }
+
   get currentUnboundSource(): string | undefined {
     return this.unboundSourceRel;
   }

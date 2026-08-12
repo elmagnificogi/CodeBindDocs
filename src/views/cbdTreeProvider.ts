@@ -122,10 +122,18 @@ export class CbdTreeProvider implements vscode.TreeDataProvider<CbdTreeItem> {
 
   private boundCache: BindingItem[] = [];
   private unboundCache: string[] = [];
+  /** Bump on refresh so in-flight / expanded-node queries cannot reuse stale lists. */
+  private loadGen = 0;
+  private loadedGen = -1;
+  private inflight: Promise<void> | undefined;
+  private inflightGen = -1;
 
   constructor(private readonly getStore: () => IndexStore | undefined) {}
 
   refresh(): void {
+    this.loadGen += 1;
+    this.boundCache = [];
+    this.unboundCache = [];
     this._onDidChangeTreeData.fire();
   }
 
@@ -139,20 +147,12 @@ export class CbdTreeProvider implements vscode.TreeDataProvider<CbdTreeItem> {
       return [];
     }
 
+    // Reload for root *and* expanded sections. After refresh(), VS Code often
+    // re-queries the old SectionItem first — returning boundCache here used to
+    // keep showing the pre-refresh list.
+    await this.ensureLoaded(store);
+
     if (!element) {
-      const index = await store.read();
-      this.boundCache = index.bindings
-        .slice()
-        .sort((a, b) => a.target.path.localeCompare(b.target.path))
-        .map((b) => new BindingItem(b));
-
-      try {
-        const coverage = await scanBindingCoverage(store, index);
-        this.unboundCache = coverage.unbound;
-      } catch {
-        this.unboundCache = [];
-      }
-
       return [
         new IndexPageItem(store.docsPath),
         new SectionItem('bound', '已绑定', this.boundCache.length),
@@ -176,5 +176,55 @@ export class CbdTreeProvider implements vscode.TreeDataProvider<CbdTreeItem> {
     }
 
     return [];
+  }
+
+  private async ensureLoaded(store: IndexStore): Promise<void> {
+    for (;;) {
+      const gen = this.loadGen;
+      if (this.loadedGen === gen) {
+        return;
+      }
+      if (!this.inflight || this.inflightGen !== gen) {
+        this.inflightGen = gen;
+        this.inflight = this.loadNow(store, gen);
+      }
+      await this.inflight;
+    }
+  }
+
+  private async loadNow(store: IndexStore, gen: number): Promise<void> {
+    try {
+      const index = await store.read();
+      if (this.loadGen !== gen) {
+        return;
+      }
+      this.boundCache = index.bindings
+        .slice()
+        .sort((a, b) => a.target.path.localeCompare(b.target.path))
+        .map((b) => new BindingItem(b));
+      try {
+        const coverage = await scanBindingCoverage(store, index);
+        if (this.loadGen !== gen) {
+          return;
+        }
+        this.unboundCache = coverage.unbound;
+      } catch {
+        if (this.loadGen !== gen) {
+          return;
+        }
+        this.unboundCache = [];
+      }
+      this.loadedGen = gen;
+    } catch {
+      if (this.loadGen === gen) {
+        this.boundCache = [];
+        this.unboundCache = [];
+        this.loadedGen = gen;
+      }
+    } finally {
+      if (this.inflightGen === gen) {
+        this.inflight = undefined;
+      }
+    }
   }
 }

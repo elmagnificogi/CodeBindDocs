@@ -233,7 +233,7 @@ heading: 概述
 | `CBD: Refresh Doc contentHash` | 单篇标记已核对 |
 | `CBD: Refresh All contentHashes` | 全部标记已核对 |
 | `CBD: Toggle Split Sync` | 开关自动分栏（`Ctrl+Alt+Shift+D`） |
-| `CBD: Refresh Doc Tree` | 刷新侧栏与漂移 |
+| `CBD: Refresh Doc Tree` | 重扫绑定并刷新侧栏、主页、`cbd-index.md` 与漂移 |
 
 ---
 

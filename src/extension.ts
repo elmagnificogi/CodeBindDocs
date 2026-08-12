@@ -522,14 +522,23 @@ function toggleSplitSync(): void {
 
 async function refreshAll(): Promise<void> {
   const store = getWorkspaceStore();
-  store?.invalidateCache();
-  if (store) {
-    await store.writeDocsIndex();
+  if (!store) {
+    void vscode.window.showWarningMessage('CBD: 请先打开一个工作区文件夹。');
+    return;
   }
+  store.invalidateCache();
+  await store.writeDocsIndex();
   treeProvider?.refresh();
   codeLensProvider?.refresh();
-  await driftChecker?.scanAll();
-  await splitSync?.syncNow();
+  await driftChecker?.scanAll({ notify: false });
+  const catalogOpen = await splitSync?.refreshCatalogIfOpen();
+  if (!catalogOpen) {
+    await splitSync?.syncNow();
+  }
+  const index = await store.read();
+  void vscode.window.showInformationMessage(
+    `CBD: 已刷新绑定（${index.bindings.length} 个）`
+  );
 }
 
 async function openDocsIndex(getStore: () => IndexStore | undefined): Promise<void> {
