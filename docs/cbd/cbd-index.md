@@ -1,6 +1,6 @@
 # CodeBind Docs 文档汇总
 
-共 **21** 个绑定。由 CodeBind Docs 自动生成，请勿手改（绑定变更后会覆盖）。
+共 **20** 个绑定。由 CodeBind Docs 自动生成，请勿手改（绑定变更后会覆盖）。
 
 文档目录：`docs/cbd/`（设置项 `cbd.docsPath`）。
 
@@ -9,7 +9,6 @@
 | 源文件 | 文档 | 类型 |
 | --- | --- | --- |
 | [`src`](../../src) | [`docs/cbd/src-README.md`](./src-README.md) | directory |
-| [`src/agent/scaffold.ts`](../../src/agent/scaffold.ts) | [`docs/cbd/agent-scaffold.md`](./agent-scaffold.md) | file |
 | [`src/drift/driftChecker.ts`](../../src/drift/driftChecker.ts) | [`docs/cbd/drift-checker.md`](./drift-checker.md) | file |
 | [`src/extension.ts`](../../src/extension.ts) | [`docs/cbd/extension-activate.md`](./extension-activate.md) | range L15-58 (activate) |
 | [`src/extension.ts`](../../src/extension.ts) | [`docs/cbd/extension.md`](./extension.md) | file |
