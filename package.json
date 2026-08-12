@@ -195,27 +195,27 @@
         "cbd.docsPath": {
           "type": "string",
           "default": "docs/cbd",
-          "description": "Workspace-relative folder for CodeBind Docs Markdown docs (bindings via YAML frontmatter). Default: docs/cbd"
+          "markdownDescription": "文档根目录（工作区相对路径），存放带 YAML `cbd:` 头的绑定 Markdown。默认 `docs/cbd`。\n\nWorkspace-relative folder for bound Markdown docs (YAML `cbd:` frontmatter). Default: `docs/cbd`."
         },
         "cbd.assetsPath": {
           "type": "string",
           "default": "",
-          "description": "Workspace-relative folder for doc assets. Empty = {docsPath}/assets"
+          "markdownDescription": "文档资源目录（工作区相对路径），粘贴图片等会写入此处。留空则使用 `{docsPath}/assets`。\n\nWorkspace-relative folder for doc assets (pasted images, etc.). Empty = `{docsPath}/assets`."
         },
         "cbd.templatesPath": {
           "type": "string",
           "default": "",
-          "description": "Workspace-relative folder for new-doc Markdown templates ({{title}} placeholder). Empty = {docsPath}/_templates. If the folder has .md files they are used; otherwise built-in templates apply."
+          "markdownDescription": "新建文档的 Markdown 模板目录（工作区相对路径），支持 `{{title}}` 占位符。留空则使用 `{docsPath}/_templates`。目录里有 `.md` 则用磁盘模板，否则用内置模板。\n\nWorkspace-relative folder for new-doc Markdown templates (`{{title}}` placeholder). Empty = `{docsPath}/_templates`. Disk `.md` files win over built-in templates."
         },
         "cbd.splitSync.enabled": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "打开/切换源文件时是否**自动**在侧栏打开绑定文档（或未绑定提示）。关闭后不再强制弹窗；可用快捷键 `Ctrl+Alt+D`（macOS `Cmd+Alt+D`）或命令 **CBD: Reveal Bound Doc** 手动打开。也可用 **CBD: Toggle Split Sync**（`Ctrl+Alt+Shift+D`）切换。"
+          "markdownDescription": "打开/切换源文件时是否**自动**打开绑定文档（或「无关联文档」页）。关闭后不再强制弹窗；可用 `Ctrl+Alt+D`（macOS `Cmd+Alt+D`）或命令 **CBD: Reveal Bound Doc** 手动打开，也可用 **CBD: Toggle Split Sync**（`Ctrl+Alt+Shift+D`）切换。\n\nWhen on, opening/switching a source file **automatically** shows its bound doc (or the unbound page). When off, use `Ctrl+Alt+D` / **CBD: Reveal Bound Doc**, or toggle with **CBD: Toggle Split Sync** (`Ctrl+Alt+Shift+D`)."
         },
         "cbd.splitSync.promptWhenUnbound": {
           "type": "boolean",
           "default": true,
-          "description": "When auto split-sync is on and the source file has no binding, show the unbound pane with a create button."
+          "markdownDescription": "自动分栏开启且当前源文件没有绑定时，是否显示「无关联文档」页并提供新建入口。\n\nWhen auto split-sync is on and the source file has no binding, show the unbound pane with a create button."
         },
         "cbd.splitSync.viewColumn": {
           "type": "string",
@@ -224,7 +224,11 @@
             "Two"
           ],
           "default": "Beside",
-          "description": "Where to open bound docs: Beside the active editor, or always ViewColumn.Two."
+          "markdownDescription": "绑定文档打开位置：`Beside` 在当前编辑器旁；`Two` 始终在第二列。\n\nWhere to open bound docs: `Beside` the active editor, or always `ViewColumn.Two`.",
+          "markdownEnumDescriptions": [
+            "在当前活动编辑器旁打开。 / Open beside the active editor.",
+            "始终在编辑器第二列打开。 / Always open in the second editor column."
+          ]
         },
         "cbd.docPane.mode": {
           "type": "string",
@@ -233,16 +237,16 @@
             "source"
           ],
           "default": "ir",
-          "enumDescriptions": [
-            "Instant Rendering (Typora-like: type Markdown, render live)",
-            "Plain Markdown source (textarea)"
-          ],
-          "description": "Markdown pane mode. ir = Typora-like instant rendering; source = plain Markdown text."
+          "markdownDescription": "文档面板编辑模式：`ir` 即时渲染（类 Typora）；`source` 纯 Markdown 文本。\n\nMarkdown pane mode: `ir` = Typora-like instant rendering; `source` = plain Markdown text.",
+          "markdownEnumDescriptions": [
+            "即时渲染（边写边预览，类 Typora）。 / Instant rendering (Typora-like live preview).",
+            "纯 Markdown 源码（文本框）。 / Plain Markdown source (textarea)."
+          ]
         },
         "cbd.docPane.outline": {
           "type": "boolean",
           "default": true,
-          "description": "Show the document outline (TOC) in bound documents. Applies to the instant-rendering editor and is enabled by default."
+          "markdownDescription": "是否在关联文档的即时渲染编辑器右侧显示大纲（TOC）。默认开启；修改后对已打开面板即时生效。\n\nShow the document outline (TOC) beside bound docs in the instant-rendering editor. Enabled by default; applies immediately to an open pane."
         }
       }
     }
