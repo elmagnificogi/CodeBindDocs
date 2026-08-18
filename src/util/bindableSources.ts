@@ -67,7 +67,10 @@ export async function scanBindingCoverage(
   index: CbdIndex
 ): Promise<CoverageReport> {
   const bound = new Set(
-    index.bindings.map((b) => normalizeRelPath(b.target.path)).filter(Boolean)
+    index.bindings
+      .filter((b) => b.target.kind !== 'directory')
+      .map((b) => normalizeRelPath(b.target.path))
+      .filter(Boolean)
   );
 
   const uris = await vscode.workspace.findFiles(SOURCE_GLOB, null);

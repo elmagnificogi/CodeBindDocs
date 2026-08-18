@@ -17,6 +17,7 @@ cbd:
 - 覆盖率扫描：`findFiles(glob, null)`，**不传自定义 exclude**，沿用工作区 `files.exclude` / `search.exclude`
 - 工程特有的大目录（如 Unity `Library/`、各项目的 build 输出）应由仓库自己的 exclude 配置，CBD **不硬编码**项目目录名
 - 结果再经 `isBindableSourceRel` 过滤：跳过文档目录、少数通用前缀（`node_modules` / `out` / `dist` / `.git` 等）、二进制与锁文件
+- **目录绑定不计入覆盖率分子**（`kind: directory` 的路径不是源文件）；其下未单独绑定的文件仍算未绑定
 
 ## 约束
 

@@ -20,7 +20,7 @@ type DocListItem = {
   doc: string;
   target: string;
   title: string;
-  kind?: 'file' | 'range' | 'index';
+  kind?: 'file' | 'range' | 'index' | 'directory';
   startLine?: number;
   endLine?: number;
   symbol?: string;
@@ -35,7 +35,7 @@ type MissingItem = {
 
 type SourceJump = {
   path: string;
-  kind: 'file' | 'range';
+  kind: 'file' | 'range' | 'directory';
   startLine?: number;
   endLine?: number;
 };
@@ -111,7 +111,13 @@ type WebToHost =
   | { type: 'navForward' }
   | { type: 'openDoc'; docRel: string }
   | { type: 'deleteDoc'; docRel: string }
-  | { type: 'openTarget'; sourceRel: string; startLine?: number; endLine?: number }
+  | {
+      type: 'openTarget';
+      sourceRel: string;
+      startLine?: number;
+      endLine?: number;
+      kind?: 'file' | 'range' | 'directory';
+    }
   | { type: 'rebindDoc'; docRel: string }
   | { type: 'retightenRange'; docRel: string }
   | { type: 'refreshHash'; docRel: string }
@@ -504,7 +510,12 @@ export class MarkdownPane {
             doc: b.doc,
             target: b.target.path,
             title: b.doc.split('/').pop() ?? b.doc,
-            kind: b.target.kind === 'range' ? 'range' : 'file',
+            kind:
+              b.target.kind === 'range'
+                ? 'range'
+                : b.target.kind === 'directory'
+                  ? 'directory'
+                  : 'file',
             startLine: b.target.startLine,
             endLine: b.target.endLine,
             symbol: b.anchors?.[0]?.symbol,
@@ -739,6 +750,7 @@ export class MarkdownPane {
           sourceRel: msg.sourceRel,
           startLine: msg.startLine,
           endLine: msg.endLine,
+          kind: msg.kind,
         });
         return;
       }
@@ -859,7 +871,12 @@ export class MarkdownPane {
           if (binding) {
             sourceJump = {
               path: binding.target.path,
-              kind: binding.target.kind === 'range' ? 'range' : 'file',
+              kind:
+                binding.target.kind === 'range'
+                  ? 'range'
+                  : binding.target.kind === 'directory'
+                    ? 'directory'
+                    : 'file',
               startLine: binding.target.startLine,
               endLine: binding.target.endLine,
             };
@@ -1485,6 +1502,9 @@ export class MarkdownPane {
         btnRevealSource.title =
           '打开绑定代码 L' + jump.startLine + (jump.endLine != null ? '-' + jump.endLine : '');
         btnRevealSource.textContent = 'Code';
+      } else if (show && jump.kind === 'directory') {
+        btnRevealSource.title = '在资源管理器中显示绑定目录';
+        btnRevealSource.textContent = 'Code';
       } else if (show) {
         btnRevealSource.title = '打开绑定的源文件';
         btnRevealSource.textContent = 'Code';
@@ -1828,6 +1848,7 @@ export class MarkdownPane {
           : 'range L' + item.startLine + '-' + item.endLine;
       }
       if (item.kind === 'index') return '汇总';
+      if (item.kind === 'directory') return 'directory';
       return 'file';
     }
 
@@ -1879,6 +1900,7 @@ export class MarkdownPane {
           root.bindings.push(item);
           return;
         }
+        const isDirectory = item.kind === 'directory';
         let node = root;
         for (let i = 0; i < parts.length; i++) {
           const part = parts[i];
@@ -1892,8 +1914,13 @@ export class MarkdownPane {
             });
           }
           const child = node.children.get(part);
+          if (!isLeaf || isDirectory) {
+            child.isFile = false;
+          }
           if (isLeaf) {
-            child.isFile = true;
+            if (!isDirectory && child.children.size === 0) {
+              child.isFile = true;
+            }
             child.bindings.push(item);
           }
           node = child;
@@ -1932,6 +1959,15 @@ export class MarkdownPane {
             li.appendChild(row);
             const ul = document.createElement('ul');
             if (isCollapsed) ul.classList.add('collapsed');
+            child.bindings
+              .slice()
+              .sort(function (a, b) { return String(a.doc).localeCompare(String(b.doc)); })
+              .forEach(function (binding) {
+                const leaf = document.createElement('li');
+                leaf.className = 'leaf';
+                leaf.appendChild(makeDocLink(binding));
+                ul.appendChild(leaf);
+              });
             renderNode(child, ul, childPath);
             li.appendChild(ul);
             row.addEventListener('click', function () {
@@ -2254,7 +2290,8 @@ export class MarkdownPane {
         type: 'openTarget',
         sourceRel: sourceJump.path,
         startLine: sourceJump.startLine,
-        endLine: sourceJump.endLine
+        endLine: sourceJump.endLine,
+        kind: sourceJump.kind
       });
     });
     btnDirectoryDoc.addEventListener('click', function () {

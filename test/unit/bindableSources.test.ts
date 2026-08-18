@@ -1,6 +1,12 @@
 import * as assert from 'assert';
-import { isBindableDirectoryRel, isBindableSourceRel } from '../../src/util/bindableSources';
+import * as vscode from 'vscode';
+import {
+  isBindableDirectoryRel,
+  isBindableSourceRel,
+  scanBindingCoverage,
+} from '../../src/util/bindableSources';
 import { IndexStore } from '../../src/store/indexStore';
+import { CbdIndex } from '../../src/store/types';
 
 suite('bindableSources', () => {
   const store = {
@@ -34,5 +40,42 @@ suite('bindableSources', () => {
     assert.strictEqual(isBindableDirectoryRel('node_modules', store), false);
     assert.strictEqual(isBindableDirectoryRel('.git', store), false);
     assert.strictEqual(isBindableDirectoryRel('', store), false);
+  });
+
+  test('scanBindingCoverage ignores directory bindings when counting files', async () => {
+    const orig = vscode.workspace.findFiles;
+    vscode.workspace.findFiles = async () =>
+      ['src/a.ts', 'src/b.ts'].map((p) => ({ fsPath: p, scheme: 'file' })) as vscode.Uri[];
+    const coverageStore = {
+      isUnderDocsPath(rel: string) {
+        return rel === 'docs/cbd' || rel.startsWith('docs/cbd/');
+      },
+      toWorkspaceRelative(uri: { fsPath: string }) {
+        return uri.fsPath.replace(/\\/g, '/');
+      },
+    } as unknown as IndexStore;
+    const index: CbdIndex = {
+      version: 1,
+      bindings: [
+        {
+          id: 'dir',
+          doc: 'docs/cbd/src-README.md',
+          target: { path: 'src', kind: 'directory' },
+        },
+        {
+          id: 'file',
+          doc: 'docs/cbd/a.md',
+          target: { path: 'src/a.ts', kind: 'file' },
+        },
+      ],
+    };
+    try {
+      const report = await scanBindingCoverage(coverageStore, index);
+      assert.strictEqual(report.boundCount, 1);
+      assert.deepStrictEqual(report.unbound, ['src/b.ts']);
+      assert.strictEqual(report.total, 2);
+    } finally {
+      vscode.workspace.findFiles = orig;
+    }
   });
 });

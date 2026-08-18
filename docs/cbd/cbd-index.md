@@ -1,6 +1,6 @@
 # CodeBind Docs 文档汇总
 
-共 **20** 个绑定。由 CodeBind Docs 自动生成，请勿手改（绑定变更后会覆盖）。
+共 **22** 个绑定。由 CodeBind Docs 自动生成，请勿手改（绑定变更后会覆盖）。
 
 文档目录：`docs/cbd/`（设置项 `cbd.docsPath`）。
 
@@ -8,12 +8,14 @@
 
 | 源文件 | 文档 | 类型 |
 | --- | --- | --- |
+| [`docs`](../../docs) | [`docs/cbd/docs-README.md`](./docs-README.md) | directory |
 | [`src`](../../src) | [`docs/cbd/src-README.md`](./src-README.md) | directory |
 | [`src/drift/driftChecker.ts`](../../src/drift/driftChecker.ts) | [`docs/cbd/drift-checker.md`](./drift-checker.md) | file |
 | [`src/extension.ts`](../../src/extension.ts) | [`docs/cbd/extension-activate.md`](./extension-activate.md) | range L15-58 (activate) |
 | [`src/extension.ts`](../../src/extension.ts) | [`docs/cbd/extension.md`](./extension.md) | file |
 | [`src/store/frontmatter.ts`](../../src/store/frontmatter.ts) | [`docs/cbd/store-frontmatter.md`](./store-frontmatter.md) | file |
 | [`src/store/indexStore.ts`](../../src/store/indexStore.ts) | [`docs/cbd/data-model.md`](./data-model.md) | file |
+| [`src/store/pathMigration.ts`](../../src/store/pathMigration.ts) | [`docs/cbd/store-pathMigration.md`](./store-pathMigration.md) | file |
 | [`src/store/types.ts`](../../src/store/types.ts) | [`docs/cbd/store-types.md`](./store-types.md) | file |
 | [`src/sync/splitSync.ts`](../../src/sync/splitSync.ts) | [`docs/cbd/split-sync.md`](./split-sync.md) | file |
 | [`src/util/bindableSources.ts`](../../src/util/bindableSources.ts) | [`docs/cbd/util-bindableSources.md`](./util-bindableSources.md) | file |

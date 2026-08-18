@@ -3,7 +3,7 @@ cbd:
   target: src/webview/markdownPane.ts
   kind: file
   symbol: MarkdownPane
-  contentHash: 74ef4034e8cc
+  contentHash: 8c0e0c1a885d
 ---
 # markdownPane.ts
 
@@ -14,7 +14,7 @@ CodeBind Docs 右侧文档面板：Vditor IR / 源码、主页、覆盖率、图
 ## 职责
 
 - IR / 源码切换；YAML 头隐藏
-- 主页：目录树 + 覆盖率摘要 + 绑定提醒 + 核对提醒；未绑定列表为独立导航页
+- 主页：目录树 + 覆盖率摘要 + 绑定提醒 + 核对提醒；未绑定列表为独立导航页。**目录绑定挂在对应文件夹节点下**（标签 `directory`），不会把该目录当成文件，从而挡住其下的文件/代码块绑定
 - 图片：`saveAsset` → assets；相对路径落盘，webview URI 预览
 - **嵌入**：加载时 `expandDocIncludes`，保存时 `collapseDocIncludes`
 - 大纲：`cbd.docPane.outline`（默认开启）；设置变化通过消息即时切换右侧 TOC，并同步显示或隐藏工具栏大纲入口，不重建 webview；Webview ready、复用 reveal、重复打开同一文档时都会重发当前值，避免保留面板漏掉配置事件
